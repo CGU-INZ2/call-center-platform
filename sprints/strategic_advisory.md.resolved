@@ -1,0 +1,213 @@
+# Strategic Advisory — Ministry Call Center Build
+
+## 1. Running Flash: Pitfalls & Guardrails
+
+### 🎯 Flash Will Forget Your Design System
+This is the #1 risk. Flash defaults to shadcn's zinc/slate palette. After every sprint you MUST visually check:
+- Is the sidebar actually `#1a1d25` or did it revert to gray?
+- Are buttons gold (`#d4a853`) or default blue?
+- Are inputs using `--bg-root` background or white?
+
+**Fix:** In your prompt to Flash, always include this line:
+> "The design system file is at `sprints/00-design-system.md`. All colors, fonts, and spacing MUST come from this file. Do NOT use shadcn default colors."
+
+### 🎯 Flash Will Create Duplicate Code
+When building Sprint 3.1 (call logging), Flash might create a new Supabase client setup instead of importing the existing one from `lib/supabase/client.ts`. After each sprint:
+- Search the codebase for duplicate `createBrowserClient` or `createServerClient` calls
+- Check for duplicate utility functions
+
+### 🎯 SQL Must Be Run Manually
+Sprint 1.2 has ~200 lines of SQL. Flash cannot execute Supabase SQL. **You must:**
+1. Let Flash generate the SQL (it's already in the sprint file)
+2. Copy it yourself to the Supabase SQL Editor
+3. Run it in the correct order (categories before contacts, because contacts references categories)
+4. Confirm tables exist before telling Flash to proceed to Sprint 2.1
+
+### 🎯 Context Window Management
+Each sprint file + design system + existing codebase can exceed Flash's context. For later sprints (4.x onward), when the codebase is larger:
+- Tell Flash which specific files to read (don't say "read the whole codebase")
+- Example: "Read `src/lib/supabase/client.ts`, `src/components/layout/Sidebar.tsx`, and `src/app/(dashboard)/layout.tsx` for context, then build Sprint 4.1"
+
+### 🎯 Test After Every Sprint, Not After Phase
+Don't batch-test. Run `npm run dev` and click through after EVERY sprint. Catching a broken import in Sprint 2.1 is easy. Catching it after Sprint 4.2 with 30 files changed is painful.
+
+---
+
+## 2. Feature Gaps I'd Add to the Plan
+
+### 🔍 Phone Lookup Bar (Critical — Add to Sprint 2.1)
+When a call comes in, the agent sees a phone number. They need to find the contact **in under 2 seconds**. The current plan has search in the contacts table, but it's buried with other filters.
+
+**Recommendation:** Add a persistent search bar in the `TopBar` (visible on every page). Type a phone number → instant lookup → click to open contact detail. This is the most-used feature in any call center.
+
+### 📦 Bulk Actions (Add to Sprint 2.1)
+Agents will ask for these within the first week:
+- "Select All Filtered → Change Status"
+- "Select 20 contacts → Assign to Agent X" (admin only)
+- "Select All → Export CSV"
+
+Add checkboxes to the contacts table and a floating action bar when items are selected.
+
+### 📤 CSV Export (Add to Sprint 2.1 or 4.2)
+Admin WILL need to export data. Government grants, ministry reports, donor updates — they all need Excel files. Add a simple "Export Filtered Contacts" button that generates a CSV with the current filter applied.
+
+### 🔁 Duplicate Detection (Add to Sprint 2.2)
+When creating a contact manually, check if a contact with the same phone number already exists. Show a warning: "A contact with this phone already exists: [Name]. View existing contact?"
+
+This prevents the biggest data quality headache in call centers.
+
+### ⏭️ "Next Contact" Flow (Add to Sprint 3.1)
+After logging a call, instead of just closing the modal, offer:
+- "Next Contact" button → opens the next assigned contact with status "New" or oldest pending follow-up
+- This creates a natural call queue without needing a separate queue system
+
+### ⌨️ Keyboard Shortcuts (Add to Sprint 7.1)
+Call center agents are speed-oriented. At minimum:
+- `/` → Focus search bar
+- `Esc` → Close any modal
+- `N` → New contact (when not in an input)
+- `L` → Log call (from contact detail)
+
+### 🖨️ Print View (Add to Sprint 5.2)
+Ministry leaders will want to print prayer request lists for group prayer sessions. Add a "Print" button on the prayer requests page that opens a clean, printer-friendly view.
+
+---
+
+## 3. Supabase Free Tier — Things That Will Bite You
+
+| Concern | Limit | Impact |
+|---|---|---|
+| Database size | 500 MB | With <1000 contacts + audit logs, you're fine for ~6 months |
+| Auth MAUs | 50,000 | Not an issue with a few agents |
+| File storage | 1 GB | Only relevant if you add profile photos later |
+| **No daily backups** | ❌ | **This is the big one.** If data is corrupted or deleted, it's gone |
+| Edge functions | 500K/month | Not using edge functions, so no issue |
+| Bandwidth | 5 GB | Fine for a data-centric app |
+
+### 🛡️ Backup Strategy (DO THIS)
+Supabase free tier has NO automatic backups. You're collecting prayer requests and ministry data — losing it would be devastating.
+
+**Recommendation:** Create a monthly manual backup routine:
+1. Go to Supabase Dashboard → Settings → Database → Download Backup (if available)
+2. OR: Add a "Download All Data" button in admin settings that exports every table to JSON/CSV
+3. Store backups in Google Drive or a local folder
+
+I can spec this as a mini-sprint if you want.
+
+### 📈 When to Upgrade to Pro ($25/month)
+Upgrade when any of these happen:
+- More than 500MB database (check in Supabase dashboard → Database → Usage)
+- Need daily automatic backups
+- Need more than 2 concurrent realtime connections (not relevant yet)
+- Need branching for development
+
+---
+
+## 4. India-Specific Legal Considerations
+
+### 🏛️ DPDP Act (Digital Personal Data Protection Act, 2023)
+You're collecting:
+- Phone numbers (personal data)
+- Prayer requests (potentially sensitive personal data)
+- Location data
+
+The DPDP Act requires:
+1. **Notice:** Users must be informed WHY their data is being collected
+2. **Consent:** You need consent before processing (the call center presumably has verbal consent, but there's no digital record)
+3. **Right to Erasure:** Contacts can request their data be deleted
+4. **Purpose Limitation:** Data collected for ministry contact can't be used for marketing
+
+**Practical Recommendations:**
+- Add a `consent_recorded` boolean to the contacts table (Sprint 1.2)
+- Add a `consent_date` timestamp
+- Add a "Delete Contact" action (not just admin-archive, but actual data deletion for DPDP requests)
+- In the CSV import, add a consent assumption note: "These contacts were imported from existing ministry records with prior consent"
+
+> [!WARNING]
+> I'm not a lawyer. For a ministry of any significant size, consult a legal advisor about DPDP compliance. The above are practical minimum steps.
+
+### 📱 Phone Number Edge Cases
+Indian phone numbers have quirks:
+- Mobile: 10 digits starting with 6/7/8/9
+- Landline: 2-4 digit STD code + 6-8 digit number
+- Some contacts might have landlines — the normalizer should handle `044-28571234` (Chennai landline)
+- WhatsApp only works with mobile numbers, so the WhatsApp button should only show for mobile-format numbers
+
+---
+
+## 5. UX Insights for Call Center Operations
+
+### 📊 The Contact Detail Page Is Everything
+Agents spend 90%+ of their time on the contact detail page during a call. It must:
+- Load in under 1 second (prefetch data, no unnecessary queries)
+- Show phone number prominently (large, clickable tel: link, not buried)
+- Have "Log Call" as the PRIMARY action (biggest, goldest button)
+- Show the last 3 interactions at a glance without scrolling
+
+### ⏱️ Don't Auto-Close the Call Modal
+After logging a call, DON'T immediately close the modal and redirect. Instead:
+1. Show a success state inside the modal
+2. Offer: "Add Follow-up" / "Open WhatsApp" / "Done"
+3. This matches the natural flow: call → log → next action
+
+### 📱 Mobile Responsiveness Matters More Than You Think
+Ministry workers are often on the field with phones. The app must work on mobile Chrome. The current plan handles responsive breakpoints, but emphasize to Flash:
+- No horizontal scrolling on mobile
+- Touch targets minimum 44x44px
+- Sidebar becomes a hamburger menu, not a compressed sidebar
+
+### 🕐 Session Timeout
+Add auto-logout after 30 minutes of inactivity. Ministry data on an unattended browser is a risk. This should be in Sprint 7.1 (hardening).
+
+---
+
+## 6. Things NOT in the Plan That Will Be Asked For Eventually
+
+These are Phase 2 features. Don't build them now, but design the schema knowing they're coming:
+
+| Feature | Why It'll Be Requested | Schema Impact |
+|---|---|---|
+| **Tags/Labels** | "I want to tag contacts with 'VBS attendee' or 'Easter camp'" | Need a `tags` junction table |
+| **Notes History** | "I want to see who edited notes and when" | Already covered by audit_log |
+| **Contact Groups** | "I want to message all contacts in Tamil Nadu" | Covered by existing filters + export |
+| **Multi-language UI** | "My agents speak Tamil, can the UI be in Tamil?" | Use `next-intl` later, not now |
+| **Reports/PDF** | "I need a monthly report for the pastor" | Add jsPDF or server-side PDF later |
+| **Calendar View** | "I want to see all follow-ups on a calendar" | The followups table already supports this |
+| **Role: Supervisor** | "I need a supervisor who sees their team only" | Would need a `team_id` column on profiles |
+
+---
+
+## 7. Pre-Flight Checklist Before Sprint 0.1
+
+Before giving Flash the first sprint, do these manually:
+
+- [ ] **Create Supabase project** at [supabase.com](https://supabase.com) — pick a region (Mumbai `ap-south-1` is closest to India)
+- [ ] **Copy the project URL and anon key** from Settings → API
+- [ ] **Copy the service role key** (keep it secret, never commit to git)
+- [ ] **Create a GitHub repo** (private) for the project
+- [ ] **Have Node.js 18+ installed** (`node --version`)
+- [ ] **Have npm 9+ installed** (`npm --version`)
+- [ ] **Have Git configured** (`git config user.name` and `git config user.email`)
+
+Only then hand Sprint 0.1 to Flash.
+
+---
+
+## 8. My Recommended Order of Operations
+
+```
+You (manual)     → Create Supabase project, copy keys
+Flash (Sprint 0.1) → Scaffold Next.js app
+You (manual)     → Add .env.local with real keys, verify app runs
+Flash (Sprint 1.1) → Auth + profiles
+You (manual)     → Create first admin account in Supabase dashboard
+You (manual)     → Run SQL to set role = 'admin'
+Flash (Sprint 1.2) → Generate schema SQL
+You (manual)     → Run ALL SQL in Supabase SQL Editor in order
+You (manual)     → RLS test protocol (critical!)
+Flash (Sprint 2.x) → Contacts UI
+Me (Opus)        → Review code for design drift, RLS issues
+... continue pattern ...
+```
+
+The key insight: **You are the glue between Flash and the infrastructure.** Flash can't create Supabase projects, run SQL in dashboards, or set Vercel env vars. Those are your manual steps.

@@ -1,0 +1,54 @@
+# Ministry Call Center — Execution Blueprint
+
+## Workflow: Opus Plans → Flash Builds
+
+**Your role (Opus):** Review output after each sprint, catch RLS bugs, design drift, integration gaps.  
+**Flash's role:** Execute sprint files verbatim. Each file is self-contained.
+
+---
+
+## Sprint Execution Order & Thinking Levels
+
+| Sprint | File | Thinking | Est. Time | Dependencies |
+|---|---|---|---|---|
+| 0 | `00-design-system.md` | — | Reference only | None |
+| 0.1 | `sprint-0.1.md` | **LOW** | 30 min | None |
+| 1.1 | `sprint-1.1.md` | **MEDIUM** | 45 min | 0.1 |
+| 1.2 | `sprint-1.2.md` | **HIGH** | 60 min | 1.1 |
+| 2.1 | `sprint-2.1.md` | **MEDIUM** | 45 min | 1.2 |
+| 2.2 | `sprint-2.2.md` | **LOW-MEDIUM** | 45 min | 2.1 |
+| 2.3 | `sprint-2.3.md` | **HIGH** | 90 min | 2.2 |
+| 3.1 | `sprint-3.md` (first half) | **LOW** | 30 min | 2.2 |
+| 3.2 | `sprint-3.md` (second half) | **MEDIUM** | 45 min | 3.1 |
+| 4.1 | `sprint-4.md` (agent dash) | **MEDIUM** | 45 min | 3.1 |
+| 4.2 | `sprint-4.md` (admin dash) | **MEDIUM** | 60 min | 4.1 |
+| 5.1 | `sprint-5-and-7.md` (WhatsApp) | **LOW** | 30 min | 2.2 |
+| 5.2 | `sprint-5-and-7.md` (Prayer) | **LOW** | 20 min | 2.2 |
+| 7.1 | `sprint-5-and-7.md` (Hardening) | **HIGH** | 60 min | All above |
+| 7.2 | `sprint-5-and-7.md` (Launch) | **LOW** | 30 min | 7.1 |
+
+> [!IMPORTANT]
+> **Between each sprint**, you (Opus) should review the output, check for:
+> 1. RLS violations (test with two agent accounts)
+> 2. Design token adherence (gold accents, dark theme, not default shadcn)
+> 3. Missing error handling (toasts, validation)
+> 4. Responsive breakpoints working
+
+## Deferred to Phase 5+ (not in scope for MVP)
+- Sprint 4.3: India geo heatmap (choropleth)
+- Sprint 4.4: Data quality dashboard
+- Sprint 6: Telephony integration (requires separate budget/KYC)
+
+## Files Location
+All sprint specs are in: `c:\Users\vbans\Documents\Call Center Web App\sprints\`
+
+## How to Prompt Flash
+
+Template prompt for each sprint:
+```
+Read the sprint spec file at [path].
+Also read the design system file at sprints/00-design-system.md.
+Execute this sprint exactly as specified.
+Use the existing codebase in c:\Users\vbans\Documents\Call Center Web App\.
+Report: what you built, any issues encountered, and the Definition of Done checklist with pass/fail for each item.
+```
