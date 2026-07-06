@@ -1,0 +1,377 @@
+'use client'
+
+import React, { useEffect, useState } from 'react'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { toast } from 'sonner'
+import { 
+  Loader2, 
+  UserPlus, 
+  Shield, 
+  Mail, 
+  KeyRound, 
+  User as UserIcon, 
+  Calendar, 
+  ChevronDown, 
+  Search, 
+  CheckCircle2, 
+  XCircle 
+} from 'lucide-react'
+
+interface UserRecord {
+  id: string
+  email: string
+  full_name: string
+  role: 'admin' | 'agent'
+  is_active: boolean
+  phone: string | null
+  created_at: string
+  last_sign_in_at: string | null
+}
+
+export default function UserManagementClient() {
+  const [users, setUsers] = useState<UserRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+  
+  // Form states
+  const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [role, setRole] = useState<'admin' | 'agent'>('agent')
+  const [submitting, setSubmitting] = useState(false)
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true)
+      const res = await fetch('/api/admin/users')
+      if (!res.ok) {
+        throw new Error('Failed to fetch users')
+      }
+      const data = await res.json()
+      setUsers(data.users || [])
+    } catch (err: any) {
+      console.error(err)
+      toast.error('Could not load users list. Please refresh the page.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchUsers()
+  }, [])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!fullName || !email || !password || !role) {
+      toast.error('Please fill out all fields.')
+      return
+    }
+
+    if (password.length < 6) {
+      toast.error('Password must be at least 6 characters.')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/admin/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fullName, email, password, role })
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create user')
+      }
+
+      toast.success('User account created successfully!')
+      
+      // Reset form fields
+      setFullName('')
+      setEmail('')
+      setPassword('')
+      setRole('agent')
+      
+      // Refresh list
+      await fetchUsers()
+    } catch (err: any) {
+      toast.error(err.message || 'An error occurred while creating the user.')
+      console.error(err)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const filteredUsers = users.filter(user => {
+    const term = searchQuery.toLowerCase()
+    return (
+      user.full_name.toLowerCase().includes(term) ||
+      user.email.toLowerCase().includes(term) ||
+      user.role.toLowerCase().includes(term)
+    )
+  })
+
+  return (
+    <div className="space-y-6">
+      <PageHeader 
+        title="User Settings" 
+        description="Provision new agent accounts, configure administrative privileges, and monitor team status."
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Creation Form Card */}
+        <div className="lg:col-span-4">
+          <Card className="bg-[var(--bg-surface)] border-[var(--border-default)] shadow-[var(--shadow-md)] relative overflow-hidden backdrop-blur-sm">
+            <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[var(--gold-400)] to-transparent" />
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 items-center justify-center flex rounded-full bg-[var(--gold-500)]/10 text-[var(--gold-400)] border border-[var(--gold-500)]/20 shadow-[0_0_10px_rgba(212,168,83,0.05)]">
+                  <UserPlus className="h-5 w-5" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg font-bold text-white">Create Member</CardTitle>
+                  <CardDescription className="text-xs text-[var(--text-secondary)]">
+                    Add new administrator or call agent
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <form onSubmit={handleSubmit}>
+              <CardContent className="space-y-4 pb-6">
+                {/* Full Name */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="fullName" className="text-xs font-semibold text-[var(--text-secondary)]">Full Name</Label>
+                  <div className="relative">
+                    <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+                    <Input
+                      id="fullName"
+                      placeholder="Jane Doe"
+                      required
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="pl-10 h-9 bg-[var(--bg-elevated)] border-[var(--border-default)] text-white placeholder-[var(--text-muted)] focus:border-[var(--gold-500)] focus:ring-[var(--gold-500)]/20"
+                      disabled={submitting}
+                    />
+                  </div>
+                </div>
+
+                {/* Email Address */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="email" className="text-xs font-semibold text-[var(--text-secondary)]">Email Address</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="jane@vanguard.com"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-10 h-9 bg-[var(--bg-elevated)] border-[var(--border-default)] text-white placeholder-[var(--text-muted)] focus:border-[var(--gold-500)] focus:ring-[var(--gold-500)]/20"
+                      disabled={submitting}
+                    />
+                  </div>
+                </div>
+
+                {/* Temp Password */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="password" className="text-xs font-semibold text-[var(--text-secondary)]">Temporary Password</Label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="••••••••"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-10 h-9 bg-[var(--bg-elevated)] border-[var(--border-default)] text-white placeholder-[var(--text-muted)] focus:border-[var(--gold-500)] focus:ring-[var(--gold-500)]/20"
+                      disabled={submitting}
+                    />
+                  </div>
+                </div>
+
+                {/* Role Select */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="role" className="text-xs font-semibold text-[var(--text-secondary)]">System Access Role</Label>
+                  <div className="relative">
+                    <Shield className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+                    <select
+                      id="role"
+                      value={role}
+                      onChange={(e) => setRole(e.target.value as 'admin' | 'agent')}
+                      className="pl-10 pr-10 h-9 w-full rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)] text-sm text-white placeholder-[var(--text-muted)] focus:border-[var(--gold-500)] focus:ring-3 focus:ring-[var(--gold-500)]/20 outline-none transition-colors appearance-none cursor-pointer"
+                      disabled={submitting}
+                    >
+                      <option value="agent">Call Agent</option>
+                      <option value="admin">System Administrator</option>
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)] pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Submit Button */}
+                <Button
+                  type="submit"
+                  className="w-full mt-2 bg-gradient-to-r from-[var(--gold-600)] to-[var(--gold-500)] hover:from-[var(--gold-500)] hover:to-[var(--gold-400)] text-[var(--text-inverse)] font-semibold shadow-md transition-all duration-200 h-9"
+                  disabled={submitting}
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating Account...
+                    </>
+                  ) : (
+                    'Provision Account'
+                  )}
+                </Button>
+              </CardContent>
+            </form>
+          </Card>
+        </div>
+
+        {/* Directory Grid */}
+        <div className="lg:col-span-8 space-y-4">
+          {/* Controls Bar */}
+          <Card className="bg-[var(--bg-surface)] border-[var(--border-default)] py-3 px-4 shadow-[var(--shadow-sm)] flex items-center justify-between">
+            <div className="relative w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+              <Input
+                placeholder="Search by name, email, role..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-8 bg-[var(--bg-elevated)] border-[var(--border-default)] text-white placeholder-[var(--text-muted)] focus:border-[var(--gold-500)]"
+              />
+            </div>
+            <div className="text-xs text-[var(--text-secondary)]">
+              Showing <span className="font-semibold text-white">{filteredUsers.length}</span> of <span className="font-semibold text-white">{users.length}</span> users
+            </div>
+          </Card>
+
+          {/* Table Card */}
+          <Card className="bg-[var(--bg-surface)] border-[var(--border-default)] shadow-[var(--shadow-md)] overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-[#1f222b] border-b border-[var(--border-default)]">
+                  <TableRow className="hover:bg-transparent border-[var(--border-default)]">
+                    <TableHead className="text-[var(--text-muted)] font-semibold py-3 px-4 text-xs tracking-wider uppercase">User</TableHead>
+                    <TableHead className="text-[var(--text-muted)] font-semibold py-3 px-4 text-xs tracking-wider uppercase">Access Role</TableHead>
+                    <TableHead className="text-[var(--text-muted)] font-semibold py-3 px-4 text-xs tracking-wider uppercase">Account Status</TableHead>
+                    <TableHead className="text-[var(--text-muted)] font-semibold py-3 px-4 text-xs tracking-wider uppercase">Registration</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    Array.from({ length: 4 }).map((_, i) => (
+                      <TableRow key={i} className="border-[var(--border-default)] hover:bg-transparent animate-pulse">
+                        <TableCell className="py-4 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-[var(--bg-elevated)]" />
+                            <div className="space-y-1">
+                              <div className="h-4 w-28 bg-[var(--bg-elevated)] rounded" />
+                              <div className="h-3 w-40 bg-[var(--bg-elevated)] rounded" />
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-4">
+                          <div className="h-5 w-16 bg-[var(--bg-elevated)] rounded-full" />
+                        </TableCell>
+                        <TableCell className="py-4 px-4">
+                          <div className="h-4 w-20 bg-[var(--bg-elevated)] rounded" />
+                        </TableCell>
+                        <TableCell className="py-4 px-4">
+                          <div className="h-4 w-24 bg-[var(--bg-elevated)] rounded" />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : filteredUsers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="py-8 text-center text-[var(--text-secondary)]">
+                        No team members found. Try refining your search query.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredUsers.map((user) => {
+                      const initials = user.full_name
+                        .split(' ')
+                        .filter(Boolean)
+                        .map((n) => n[0])
+                        .join('')
+                        .toUpperCase()
+                        .slice(0, 2)
+                      
+                      const formattedDate = new Date(user.created_at).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      })
+
+                      const isSystemAdmin = user.role === 'admin'
+
+                      return (
+                        <TableRow key={user.id} className="border-b border-[var(--border-default)] hover:bg-[var(--bg-hover)] transition-colors">
+                          <TableCell className="py-3.5 px-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-full bg-[var(--gold-500)]/15 border border-[var(--gold-500)]/20 text-[var(--gold-400)] flex items-center justify-center font-bold text-sm shrink-0">
+                                {initials}
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-semibold text-white truncate">{user.full_name}</span>
+                                <span className="text-xs text-[var(--text-secondary)] truncate">{user.email}</span>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3.5 px-4">
+                            <Badge 
+                              variant="outline"
+                              className={
+                                isSystemAdmin 
+                                  ? 'bg-[var(--gold-500)]/10 text-[var(--gold-400)] border-[var(--gold-500)]/30 px-2 py-0.5 rounded font-medium'
+                                  : 'bg-white/5 text-[var(--text-secondary)] border-white/10 px-2 py-0.5 rounded font-medium'
+                              }
+                            >
+                              {isSystemAdmin ? 'Admin' : 'Agent'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-3.5 px-4">
+                            <div className="flex items-center gap-2">
+                              {user.is_active ? (
+                                <>
+                                  <span className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse" />
+                                  <span className="text-xs text-white">Active</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="w-2 h-2 rounded-full bg-[var(--danger)]" />
+                                  <span className="text-xs text-[var(--text-secondary)]">Disabled</span>
+                                </>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3.5 px-4 text-xs text-[var(--text-secondary)]">
+                            <div className="flex items-center gap-1.5">
+                              <Calendar className="h-3.5 w-3.5 shrink-0" />
+                              {formattedDate}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        </div>
+      </div>
+    </div>
+  )
+}

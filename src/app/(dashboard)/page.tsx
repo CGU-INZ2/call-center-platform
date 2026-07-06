@@ -1,40 +1,38 @@
-import { PageHeader } from '@/components/shared/PageHeader'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Phone, Users, Clock, ArrowUpRight } from 'lucide-react'
+import { createClient as createServerSupabase } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
+import { Loader2 } from 'lucide-react'
+import DashboardClient from './DashboardClient'
 
-export default function DashboardOverview() {
-  const stats = [
-    { title: 'Total Calls Today', value: '1,248', icon: Phone, trend: '+12%' },
-    { title: 'Active Agents', value: '45', icon: Users, trend: 'Stable' },
-    { title: 'Avg Handle Time', value: '4m 12s', icon: Clock, trend: '-8%' },
-  ]
+export default async function DashboardPage() {
+  const supabase = await createServerSupabase()
+
+  // 1. Get authenticated user
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) {
+    redirect('/login')
+  }
+
+  // 2. Fetch user profile role to verify they exist
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (profileError || !profile) {
+    redirect('/login')
+  }
 
   return (
-    <div className="space-y-6">
-      <PageHeader 
-        title="Overview" 
-        description="Monitor today's call center performance and agent activity."
-      />
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {stats.map((stat, i) => (
-          <Card key={i} className="bg-[var(--bg-surface)] border-[var(--border-default)]">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-[var(--text-muted)]">
-                {stat.title}
-              </CardTitle>
-              <stat.icon className="h-4 w-4 text-[var(--text-muted)]" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">{stat.value}</div>
-              <p className="text-xs text-[var(--success)] flex items-center mt-1">
-                <ArrowUpRight className="h-3 w-3 mr-1" />
-                {stat.trend} from yesterday
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+    <Suspense fallback={
+      <div className="flex h-[50vh] items-center justify-center text-[var(--text-secondary)]">
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--gold-400)] mr-2" />
+        Loading dashboard...
       </div>
-    </div>
+    }>
+      <DashboardClient />
+    </Suspense>
   )
 }
+

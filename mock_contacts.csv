@@ -1,0 +1,7 @@
+Name,Phone,Email,Address,State,City,Language,Program,Prayer,ROR,Cell Group,Leader,Notes
+Rajesh Kumar,9876543210,rajesh@example.com,"Flat 101, Park Avenue, Bangalore, Karnataka",Karnataka,Bangalore,English,Morning Grace,10 AM,Yes,Cell A,Leader A,Nice guy
+Priya Patel,09876543211,priya@invalid,"202 Lakeview, Ahmedabad, Gujarat",,,Gujarati,,,No,,,Likes daily ROR
+Amit Sharma,919876543212,amit@example.com,"12 North Road, Kolkata, WB",,,Hindi,,,,,,,
+,9876543213,test@example.com,"Some address, Delhi, DL",Delhi,Delhi,,,,,,,
+Duplicate User,9876543210,dup@example.com,Another address,,,,,,,,,
+Valid Test User,9998887776,valid@test.com,"100 Tech Park, Mumbai, MH",,,Marathi,Evening Prayer,Wants prayer,Yes,Cell B,Leader B,Testing location parser
