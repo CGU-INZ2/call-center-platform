@@ -14,14 +14,17 @@ export function SidebarItem({ icon: Icon, label, href, isActive }: SidebarItemPr
     <Link
       href={href}
       className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-md transition-colors border-l-2 border-transparent",
-        isActive 
-          ? "bg-[var(--bg-hover)] text-white border-l-[var(--gold-400)]" 
-          : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-white"
+        // Base: compact density matching the mockup
+        "flex items-center gap-2 px-2.5 py-[7px] text-xs transition-colors duration-150",
+        isActive
+          // Active: flat left-bar highlight (no rounded left edge), gold accent
+          ? "bg-[#282c38] border-l-[3px] border-[var(--gold-400)] text-[var(--text-primary)] pl-[7px]"
+          // Inactive: rounded, muted, hover bg
+          : "rounded-md border-l-[3px] border-transparent text-[var(--text-secondary)] hover:bg-[#282c38] hover:text-[var(--text-primary)] pl-[7px]"
       )}
     >
-      <Icon className="w-5 h-5" />
-      <span className="font-medium text-sm">{label}</span>
+      <Icon className="w-[15px] h-[15px] shrink-0" />
+      <span className="font-medium">{label}</span>
     </Link>
   )
 }

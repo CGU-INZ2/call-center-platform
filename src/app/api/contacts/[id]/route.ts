@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient as createServerSupabase } from '@/lib/supabase/server'
+import { isRateLimited } from '@/lib/rate-limit'
+import { sanitizeInput } from '@/lib/sanitize'
 
 export async function GET(
   request: Request,
@@ -58,6 +60,22 @@ export async function PUT(
       return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
     }
 
+    // Rate limiting check
+    const ip = request.headers.get('x-forwarded-for') || user.id
+    const rateLimit = await isRateLimited({
+      action: 'update_contact',
+      identifier: ip,
+      maxRequests: 60,
+      windowMs: 60000 // 1 minute
+    })
+
+    if (rateLimit.limited) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': '60' } }
+      )
+    }
+
     // Fetch the existing contact to verify ownership/RLS
     const { data: existingContact, error: fetchError } = await supabase
       .from('contacts')
@@ -102,8 +120,26 @@ export async function PUT(
       return NextResponse.json({ error: 'Full name is required' }, { status: 400 })
     }
 
+    // Sanitize user inputs
+    const sanitizedFullName = sanitizeInput(full_name)
+    const sanitizedPhone = sanitizeInput(phone)
+    const sanitizedEmail = sanitizeInput(email)
+    const sanitizedNotes = sanitizeInput(notes)
+    const sanitizedLanguage = sanitizeInput(language)
+    const sanitizedCountry = sanitizeInput(country)
+    const sanitizedState = sanitizeInput(state)
+    const sanitizedDistrictCity = sanitizeInput(district_city)
+    const sanitizedRawAddress = sanitizeInput(raw_address)
+    const sanitizedProgramName = sanitizeInput(program_name)
+    const sanitizedPrayerDayTime = sanitizeInput(prayer_day_time)
+    const sanitizedCellGroupName = sanitizeInput(cell_group_name)
+    const sanitizedCellGroupLeader = sanitizeInput(cell_group_leader)
+    const sanitizedCallStatus = sanitizeInput(call_status)
+    const sanitizedSource = sanitizeInput(source)
+    const sanitizedAssignedAgentId = sanitizeInput(assigned_agent_id)
+
     // Phone normalization: prepend +91 if 10 digits
-    let formattedPhone = phone ? phone.trim() : null
+    let formattedPhone = sanitizedPhone ? sanitizedPhone.trim() : null
     if (formattedPhone) {
       const digits = formattedPhone.replace(/\D/g, '')
       if (digits.length === 10) {
@@ -112,32 +148,32 @@ export async function PUT(
     }
 
     const updateData: any = {
-      full_name,
+      full_name: sanitizedFullName,
       phone: formattedPhone,
-      email: email || null,
+      email: sanitizedEmail || null,
       category_id: category_id ? parseInt(category_id, 10) : null,
-      notes: notes || null,
-      country: country || 'India',
-      state: state || null,
-      district_city: district_city || null,
-      language: language || null,
-      raw_address: raw_address || null,
+      notes: sanitizedNotes || null,
+      country: sanitizedCountry || 'India',
+      state: sanitizedState || null,
+      district_city: sanitizedDistrictCity || null,
+      language: sanitizedLanguage || null,
+      raw_address: sanitizedRawAddress || null,
       watched_program: watched_program === true || watched_program === 'true',
-      program_name: program_name || null,
+      program_name: sanitizedProgramName || null,
       want_prayer: want_prayer === true || want_prayer === 'true',
-      prayer_day_time: prayer_day_time || null,
+      prayer_day_time: sanitizedPrayerDayTime || null,
       want_ror_daily: want_ror_daily === true || want_ror_daily === 'true',
-      cell_group_name: cell_group_name || null,
-      cell_group_leader: cell_group_leader || null,
-      call_status: call_status || 'New',
-      source: source || null
+      cell_group_name: sanitizedCellGroupName || null,
+      cell_group_leader: sanitizedCellGroupLeader || null,
+      call_status: sanitizedCallStatus || 'New',
+      source: sanitizedSource || null
     }
 
     // Agent role cannot change the assigned agent
     if (profile.role === 'agent') {
       updateData.assigned_agent_id = user.id
     } else {
-      updateData.assigned_agent_id = assigned_agent_id || null
+      updateData.assigned_agent_id = sanitizedAssignedAgentId || null
     }
 
     const { data: updatedContact, error: updateError } = await supabase

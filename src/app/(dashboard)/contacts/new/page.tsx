@@ -28,23 +28,25 @@ export default async function NewContactPage() {
 
   const userRole = profile.role
 
-  // 3. Fetch categories
-  const { data: categories, error: catError } = await supabase
-    .from('categories')
-    .select('id, label, color_hex')
-    .order('label', { ascending: true })
+  // 3 & 4. Fetch categories and agents concurrently
+  const [categoriesRes, agentsRes] = await Promise.all([
+    supabase
+      .from('categories')
+      .select('id, label, color_hex')
+      .order('label', { ascending: true }),
+    supabase
+      .from('profiles')
+      .select('id, full_name')
+      .eq('role', 'agent')
+      .order('full_name', { ascending: true })
+  ])
+
+  const { data: categories, error: catError } = categoriesRes
+  const { data: agentsData, error: agentsError } = agentsRes
 
   if (catError) {
     console.error('Error fetching categories:', catError)
   }
-
-  // 4. Fetch agents
-  const { data: agentsData, error: agentsError } = await supabase
-    .from('profiles')
-    .select('id, full_name')
-    .eq('role', 'agent')
-    .order('full_name', { ascending: true })
-
   if (agentsError) {
     console.error('Error fetching agents:', agentsError)
   }

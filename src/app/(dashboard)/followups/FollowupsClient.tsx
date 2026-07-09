@@ -160,7 +160,7 @@ export default function FollowupsClient({ followups: initialFollowups, userRole 
     return (
       <div
         key={f.id}
-        className="bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg overflow-hidden shadow-sm hover:border-[var(--border-subtle)] transition-all animate-in fade-in duration-300"
+        className="bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg overflow-hidden shadow-sm hover:border-[var(--border-subtle)] transition-all"
         style={{ borderLeft: `3px solid ${borderColor}` }}
       >
         <div className="p-4 space-y-3">

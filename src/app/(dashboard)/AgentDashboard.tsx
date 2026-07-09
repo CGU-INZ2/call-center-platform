@@ -11,6 +11,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { toast } from 'sonner'
 import {
   Users,
+  UserPlus,
   Phone,
   Clock,
   AlertCircle,
@@ -66,6 +67,72 @@ export default function AgentDashboard() {
 
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
+  const [isLoadingNext, setIsLoadingNext] = useState(false)
+
+  const handleTakeContact = async () => {
+    if (!profile?.id) return
+    setIsLoadingNext(true)
+
+    try {
+      // 1. Fetch oldest pending follow-up (overdue or due)
+      const { data: followupData, error: fuError } = await supabase
+        .from('followups')
+        .select('contact_id')
+        .eq('agent_id', profile.id)
+        .eq('status', 'pending')
+        .order('due_at', { ascending: true })
+        .limit(1)
+
+      if (fuError) throw fuError
+
+      if (followupData && followupData.length > 0) {
+        toast.success('Routing to your next pending follow-up!')
+        router.push(`/contacts/${followupData[0].contact_id}`)
+        return
+      }
+
+      // 2. Fetch oldest New contact
+      const { data: newContact, error: newErr } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('assigned_agent_id', profile.id)
+        .eq('call_status', 'New')
+        .order('created_at', { ascending: true })
+        .limit(1)
+
+      if (newErr) throw newErr
+
+      if (newContact && newContact.length > 0) {
+        toast.success('Routing to next new contact!')
+        router.push(`/contacts/${newContact[0].id}`)
+        return
+      }
+
+      // 3. Fetch oldest Attempted contact (retry)
+      const { data: attemptedContact, error: attErr } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('assigned_agent_id', profile.id)
+        .eq('call_status', 'Attempted')
+        .order('last_contacted_at', { ascending: true })
+        .limit(1)
+
+      if (attErr) throw attErr
+
+      if (attemptedContact && attemptedContact.length > 0) {
+        toast.success('Routing to next retry contact!')
+        router.push(`/contacts/${attemptedContact[0].id}`)
+        return
+      }
+
+      toast.info('All caught up! No pending follow-ups or contacts left in your queue.')
+    } catch (err: any) {
+      console.error('Error fetching next contact:', err)
+      toast.error('Failed to retrieve the next contact.')
+    } finally {
+      setIsLoadingNext(false)
+    }
+  }
 
   // KPI States
   const [myContactsCount, setMyContactsCount] = useState(0)
@@ -293,67 +360,82 @@ export default function AgentDashboard() {
     )
   }
 
-  const kpis = [
-    {
-      title: 'My Contacts',
-      value: myContactsCount,
-      description: 'Assigned in database',
-      icon: Users,
-      color: 'text-[var(--info)]',
-      glow: 'shadow-[0_0_15px_rgba(96,165,250,0.1)]',
-    },
-    {
-      title: 'Calls Today',
-      value: callsTodayCount,
-      description: 'Logged since midnight',
-      icon: Phone,
-      color: 'text-[var(--gold-400)]',
-      glow: 'shadow-[0_0_15px_rgba(212,168,83,0.1)]',
-    },
-    {
-      title: 'Pending Follow-ups',
-      value: pendingFollowupsCount,
-      description: 'Scheduled for later',
-      icon: Clock,
-      color: 'text-[var(--success)]',
-      glow: 'shadow-[0_0_15px_rgba(52,211,153,0.1)]',
-    },
-    {
-      title: 'Overdue Follow-ups',
-      value: overdueFollowupsCount,
-      description: 'Action required immediately',
-      icon: AlertCircle,
-      color: overdueFollowupsCount > 0 ? 'text-[var(--danger)]' : 'text-[var(--text-muted)]',
-      glow: overdueFollowupsCount > 0 ? 'shadow-[0_0_15px_rgba(248,113,113,0.15)]' : '',
-    },
-  ]
+
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-8">
       <PageHeader
         title={`Welcome Back, ${profile?.full_name || 'Agent'}`}
         description="Here is your personal overview of contacts, calls, and follow-ups."
       />
 
-      {/* KPI Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {kpis.map((kpi, idx) => (
-          <Card
-            key={idx}
-            className={`bg-[var(--bg-surface)] border-[var(--border-default)] hover:border-[var(--gold-500)]/30 transition-all duration-300 ${kpi.glow}`}
-          >
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-[var(--text-secondary)]">{kpi.title}</p>
-                <kpi.icon className={`h-5 w-5 ${kpi.color}`} />
-              </div>
-              <div className="mt-4 flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-white tracking-tight">{kpi.value}</span>
-              </div>
-              <p className="text-xs text-[var(--text-muted)] mt-1.5">{kpi.description}</p>
-            </CardContent>
-          </Card>
-        ))}
+      {/* Prominent Take Next Contact Hero Banner */}
+      <div className="relative overflow-hidden rounded-[20px] border border-[var(--border-default)] bg-gradient-to-r from-[var(--bg-surface)] to-[var(--bg-elevated)] p-6 sm:p-8 shadow-md">
+        {/* Decorative gold glows */}
+        <div className="absolute -right-20 -top-20 w-44 h-44 rounded-full bg-[var(--gold-400)]/5 blur-[60px] pointer-events-none" />
+        <div className="absolute -left-20 -bottom-20 w-44 h-44 rounded-full bg-[var(--gold-400)]/5 blur-[60px] pointer-events-none" />
+
+        <div className="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+              Ready for your next outreach?
+            </h2>
+            <p className="text-sm text-[var(--text-secondary)] max-w-xl leading-relaxed">
+              We've prepared your calling queue. Click below to automatically retrieve the next highest priority contact (overdue follow-ups, new leads, or retries).
+            </p>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto shrink-0">
+            <button
+              onClick={handleTakeContact}
+              disabled={isLoadingNext}
+              className="group relative flex items-center justify-center gap-2 px-6 py-3.5 rounded-[12px] bg-[var(--gold-400)] hover:bg-[var(--gold-300)] text-[#0f1117] font-bold dot-pulse-gold transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none w-full sm:w-auto overflow-hidden shrink-0"
+            >
+              {isLoadingNext ? (
+                <>
+                  <Loader2 className="h-4.5 w-4.5 animate-spin" />
+                  <span>Finding Next Contact...</span>
+                </>
+              ) : (
+                <>
+                  <Phone className="h-4.5 w-4.5 fill-current" />
+                  <span className="tracking-wide">Take Next Contact</span>
+                  <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </>
+              )}
+            </button>
+
+            <Link
+              href="/contacts/new"
+              className="group flex items-center justify-center gap-2 px-6 py-3.5 rounded-[12px] border border-[var(--gold-400)]/30 hover:border-[var(--gold-400)] bg-[var(--gold-400)]/5 hover:bg-[var(--gold-400)]/10 text-[var(--gold-400)] hover:text-[var(--gold-300)] font-bold transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] w-full sm:w-auto shrink-0"
+            >
+              <UserPlus className="h-4.5 w-4.5" />
+              <span className="tracking-wide">Add New Contact</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Compact Stat Strip */}
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-[16px] flex flex-col sm:flex-row items-center divide-y sm:divide-y-0 sm:divide-x divide-[var(--border-subtle)] shadow-sm">
+        <div className="flex-1 w-full sm:w-auto p-5">
+          <div className="text-xs text-[var(--text-secondary)] mb-1">My Contacts</div>
+          <div className="text-2xl font-mono text-white font-medium">{myContactsCount}</div>
+        </div>
+        <div className="flex-1 w-full sm:w-auto p-5">
+          <div className="text-xs text-[var(--text-secondary)] mb-1">Calls Today</div>
+          <div className="text-2xl font-mono text-white font-medium">{callsTodayCount}</div>
+        </div>
+        <div className="flex-1 w-full sm:w-auto p-5">
+          <div className="text-xs text-[var(--text-secondary)] mb-1">Pending Follow-ups</div>
+          <div className="text-2xl font-mono text-white font-medium">{pendingFollowupsCount}</div>
+        </div>
+        <div className="flex-1 w-full sm:w-auto p-5">
+          <div className="text-xs text-[var(--text-secondary)] mb-1">Overdue Follow-ups</div>
+          <div className={`text-2xl font-mono font-medium ${overdueFollowupsCount > 0 ? 'text-[var(--danger)]' : 'text-white'}`}>
+            {overdueFollowupsCount}
+          </div>
+        </div>
       </div>
 
       {/* Charts Row */}

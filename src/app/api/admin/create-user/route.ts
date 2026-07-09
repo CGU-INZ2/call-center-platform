@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient as createServerSupabase } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isRateLimited } from '@/lib/rate-limit'
+import { sanitizeInput } from '@/lib/sanitize'
 
 export async function POST(request: Request) {
   try {
@@ -23,6 +25,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 })
     }
 
+    // 2.5 Rate limiting check
+    const ip = request.headers.get('x-forwarded-for') || adminUser.id
+    const rateLimit = await isRateLimited({
+      action: 'create_user',
+      identifier: ip,
+      maxRequests: 10,
+      windowMs: 60000
+    })
+
+    if (rateLimit.limited) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': '60' } }
+      )
+    }
+
     // 3. Parse request body
     const { email, password, fullName, role } = await request.json()
     if (!email || !password || !fullName || !role) {
@@ -33,15 +51,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid role value' }, { status: 400 })
     }
 
+    const sanitizedFullName = sanitizeInput(fullName)
+    const sanitizedEmail = sanitizeInput(email)
+    const sanitizedRole = sanitizeInput(role)
+
     // 4. Create user using admin client (bypasses RLS & verification flows)
     const supabaseAdmin = createAdminClient()
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
+      email: sanitizedEmail,
       password,
       email_confirm: true,
       user_metadata: {
-        full_name: fullName,
-        role: role
+        full_name: sanitizedFullName,
+        role: sanitizedRole
       }
     })
 
@@ -61,9 +83,9 @@ export async function POST(request: Request) {
       entity_type: 'profile',
       entity_id: newUser.id,
       after_data: {
-        email,
-        role,
-        full_name: fullName
+        email: sanitizedEmail,
+        role: sanitizedRole,
+        full_name: sanitizedFullName
       }
     })
 
@@ -78,3 +100,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+

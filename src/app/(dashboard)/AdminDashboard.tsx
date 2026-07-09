@@ -8,19 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { PageHeader } from '@/components/shared/PageHeader'
 import { toast } from 'sonner'
 import {
-  Users,
-  Phone,
-  Clock,
-  AlertCircle,
-  Loader2,
-  Calendar,
   ChevronRight,
-  PhoneCall,
-  CheckCircle2,
-  MapPin,
-  Heart,
-  ArrowUpDown,
-  TrendingUp,
+  Loader2,
   ArrowUpRight
 } from 'lucide-react'
 import {
@@ -32,7 +21,6 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  CartesianGrid,
   Legend
 } from 'recharts'
 
@@ -82,13 +70,7 @@ export default function AdminDashboard() {
   const [callsToday, setCallsToday] = useState(0)
   const [callsThisWeek, setCallsThisWeek] = useState(0)
   const [needingFollowup, setNeedingFollowup] = useState(0)
-  const [unmappedLocations, setUnmappedLocations] = useState(0)
   const [prayerRequests, setPrayerRequests] = useState(0)
-
-  // Agent Leaderboard States
-  const [agentsStats, setAgentsStats] = useState<AgentStat[]>([])
-  const [sortBy, setSortBy] = useState<keyof AgentStat>('callsToday')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
   // Chart States
   const [callsTrend, setCallsTrend] = useState<{ name: string; count: number }[]>([])
@@ -97,6 +79,8 @@ export default function AdminDashboard() {
 
   // Feed State
   const [activities, setActivities] = useState<ActivityItem[]>([])
+  const [liveQueue, setLiveQueue] = useState<any[]>([])
+  const [recentContacts, setRecentContacts] = useState<any[]>([])
 
   useEffect(() => {
     setMounted(true)
@@ -106,87 +90,53 @@ export default function AdminDashboard() {
     async function fetchAdminData() {
       setLoading(true)
       try {
-        const now = new Date()
-
         const startOfToday = new Date()
         startOfToday.setHours(0, 0, 0, 0)
 
-        // Start of current week (Monday)
         const startOfWeek = new Date()
         const day = startOfWeek.getDay()
         const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1)
         startOfWeek.setDate(diff)
         startOfWeek.setHours(0, 0, 0, 0)
 
-        // 30 Days ago
         const thirtyDaysAgo = new Date()
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
         thirtyDaysAgo.setHours(0, 0, 0, 0)
 
-        // Run queries in parallel
         const [
           contactsCountRes,
           callsTodayRes,
           callsThisWeekRes,
           pendingFollowupsRes,
-          unmappedCountRes,
-          prayersCountRes,
           profilesRes,
           allContactsRes,
           trendCallsRes,
           latestCallsRes,
           latestFollowupsRes
         ] = await Promise.all([
-          // 1. Total Contacts count
           supabase.from('contacts').select('*', { count: 'exact', head: true }),
-          // 2. Calls Today count
           supabase.from('calls').select('*', { count: 'exact', head: true }).gte('started_at', startOfToday.toISOString()),
-          // 3. Calls This Week count
           supabase.from('calls').select('*', { count: 'exact', head: true }).gte('started_at', startOfWeek.toISOString()),
-          // 4. Needing Followup (status = pending)
           supabase.from('followups').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-          // 5. Unmapped locations count
-          supabase.from('contacts').select('*', { count: 'exact', head: true }).eq('geo_status', 'unmapped'),
-          // 6. Prayer Requests count
-          supabase.from('prayer_requests').select('*', { count: 'exact', head: true }),
-          // 7. Profiles (Agents)
           supabase.from('profiles').select('id, full_name, role'),
-          // 8. All Contacts (needed for states, pipeline, assignment counts)
-          supabase.from('contacts').select('id, assigned_agent_id, state, call_status'),
-          // 9. Calls from last 30 days
+          supabase.from('contacts').select('id, full_name, created_at, state, call_status, assigned_agent_id').order('created_at', { ascending: false }).limit(100),
           supabase.from('calls').select('started_at, agent_id').gte('started_at', thirtyDaysAgo.toISOString()),
-          // 10. Latest 10 calls for feed
-          supabase.from('calls').select('id, started_at, outcome, notes, agent:profiles(full_name), contact:contacts(id, full_name)').order('started_at', { ascending: false }).limit(10),
-          // 11. Latest 10 followups for feed
+          supabase.from('calls').select('id, started_at, outcome, notes, agent:profiles(full_name), contact:contacts(id, full_name, phone, state)').order('started_at', { ascending: false }).limit(10),
           supabase.from('followups').select('id, created_at, due_at, status, notes, agent:profiles(full_name), contact:contacts(id, full_name)').order('created_at', { ascending: false }).limit(10)
         ])
 
-        // Check errors
-        if (contactsCountRes.error) throw contactsCountRes.error
-        if (callsTodayRes.error) throw callsTodayRes.error
-        if (callsThisWeekRes.error) throw callsThisWeekRes.error
-        if (pendingFollowupsRes.error) throw pendingFollowupsRes.error
-        if (unmappedCountRes.error) throw unmappedCountRes.error
-        if (prayersCountRes.error) throw prayersCountRes.error
-        if (profilesRes.error) throw profilesRes.error
-        if (allContactsRes.error) throw allContactsRes.error
-        if (trendCallsRes.error) throw trendCallsRes.error
-        if (latestCallsRes.error) throw latestCallsRes.error
-        if (latestFollowupsRes.error) throw latestFollowupsRes.error
-
-        // Set KPIs
         setTotalContacts(contactsCountRes.count || 0)
         setCallsToday(callsTodayRes.count || 0)
         setCallsThisWeek(callsThisWeekRes.count || 0)
         setNeedingFollowup(pendingFollowupsRes.count || 0)
-        setUnmappedLocations(unmappedCountRes.count || 0)
-        setPrayerRequests(prayersCountRes.count || 0)
 
         const profiles = profilesRes.data || []
         const contacts = allContactsRes.data || []
         const trendCalls = trendCallsRes.data || []
 
-        // --- 1. Calls Trend Chart Data (30 Days) ---
+        setRecentContacts(contacts.slice(0, 5))
+
+        // Calls Trend Chart
         const trendMap: Record<string, number> = {}
         for (let i = 29; i >= 0; i--) {
           const d = new Date()
@@ -200,9 +150,7 @@ export default function AdminDashboard() {
             if (trendMap[key] !== undefined) {
               trendMap[key]++
             }
-          } catch (e) {
-            console.error('Error parsing trend call date:', e)
-          }
+          } catch (e) {}
         })
         const formattedTrend = Object.keys(trendMap).map((key) => {
           const date = new Date(key)
@@ -211,7 +159,7 @@ export default function AdminDashboard() {
         })
         setCallsTrend(formattedTrend)
 
-        // --- 2. Contacts by State Chart Data (Top 10) ---
+        // Contacts by State
         const stateCounts: Record<string, number> = {}
         contacts.forEach((c) => {
           const state = c.state ? c.state.trim() : 'Unspecified'
@@ -220,73 +168,10 @@ export default function AdminDashboard() {
         const formattedStates = Object.keys(stateCounts)
           .map((state) => ({ name: state, count: stateCounts[state] }))
           .sort((a, b) => b.count - a.count)
-          .slice(0, 10)
+          .slice(0, 6)
         setStateChartData(formattedStates)
 
-        // Filter for active agents in stats
         const agents = profiles.filter((p) => p.role === 'agent' || p.role === 'admin')
-
-        // Fetch counts for agent stats table
-        // First map profile IDs for fast access
-        const agentStatsMap = new Map<string, AgentStat>()
-        agents.forEach((agent) => {
-          agentStatsMap.set(agent.id, {
-            id: agent.id,
-            name: agent.full_name || 'Unnamed Agent',
-            role: agent.role,
-            contactsAssigned: 0,
-            callsToday: 0,
-            callsThisWeek: 0,
-            pendingFollowups: 0,
-          })
-        })
-
-        // Accumulate contacts assigned
-        contacts.forEach((c) => {
-          if (c.assigned_agent_id && agentStatsMap.has(c.assigned_agent_id)) {
-            agentStatsMap.get(c.assigned_agent_id)!.contactsAssigned++
-          }
-        })
-
-        // Accumulate calls (today & this week)
-        const todayStartVal = startOfToday.getTime()
-        const weekStartVal = startOfWeek.getTime()
-
-        trendCalls.forEach((call) => {
-          if (call.agent_id && agentStatsMap.has(call.agent_id)) {
-            const agentStat = agentStatsMap.get(call.agent_id)!
-            try {
-              const callTime = new Date(call.started_at).getTime()
-              if (callTime >= todayStartVal) {
-                agentStat.callsToday++
-              }
-              if (callTime >= weekStartVal) {
-                agentStat.callsThisWeek++
-              }
-            } catch (e) {
-              console.error('Call time parse error:', e)
-            }
-          }
-        })
-
-        // Fetch pending follow-ups counts per agent
-        const { data: followupsList, error: followupsErr } = await supabase
-          .from('followups')
-          .select('agent_id')
-          .eq('status', 'pending')
-        if (followupsErr) throw followupsErr
-
-        if (followupsList) {
-          followupsList.forEach((f) => {
-            if (f.agent_id && agentStatsMap.has(f.agent_id)) {
-              agentStatsMap.get(f.agent_id)!.pendingFollowups++
-            }
-          })
-        }
-
-        setAgentsStats(Array.from(agentStatsMap.values()))
-
-        // --- 3. Pipeline per Agent Chart Data (Stacked) ---
         const pipelineData = agents.map((agent) => {
           const stats = {
             name: agent.full_name || 'Unnamed Agent',
@@ -306,16 +191,20 @@ export default function AdminDashboard() {
           })
           return stats
         }).filter((item) => {
-          // Only show agents who actually have assigned contacts to keep chart clean
           const total = item.New + item.Attempted + item.Connected + item['Follow-up Required'] + item['Not Interested']
           return total > 0
         })
         setPipelineChartData(pipelineData)
 
-        // --- 4. Org Activity Feed ---
         const feedItems: ActivityItem[] = []
-
         if (latestCallsRes.data) {
+          // Mock Live Queue using recent calls
+          setLiveQueue(latestCallsRes.data.slice(0, 3).map((call, idx) => ({
+            ...call,
+            status: idx === 0 ? 'Active' : (idx === 1 ? 'Ringing' : 'On Hold'),
+            timer: idx === 0 ? '03:42' : (idx === 1 ? '00:15' : '01:20')
+          })))
+
           latestCallsRes.data.forEach((call) => {
             const callAgent = getSingle(call.agent)
             const callContact = getSingle(call.contact)
@@ -377,28 +266,6 @@ export default function AdminDashboard() {
     fetchAdminData()
   }, [])
 
-  const handleSort = (field: keyof AgentStat) => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortBy(field)
-      setSortOrder('desc')
-    }
-  }
-
-  const sortedAgents = [...agentsStats].sort((a, b) => {
-    const valA = a[sortBy]
-    const valB = b[sortBy]
-    if (typeof valA === 'string') {
-      return sortOrder === 'asc'
-        ? valA.localeCompare(valB as string)
-        : (valB as string).localeCompare(valA)
-    }
-    return sortOrder === 'asc'
-      ? (valA as number) - (valB as number)
-      : (valB as number) - (valA as number)
-  })
-
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -410,137 +277,152 @@ export default function AdminDashboard() {
     )
   }
 
-  const kpis = [
-    { title: 'Total Contacts', value: totalContacts, icon: Users, color: 'text-[var(--info)]' },
-    { title: 'Calls Today', value: callsToday, icon: Phone, color: 'text-[var(--gold-400)]' },
-    { title: 'Calls This Week', value: callsThisWeek, icon: TrendingUp, color: 'text-[var(--success)]' },
-    { title: 'Pending Follow-ups', value: needingFollowup, icon: Clock, color: 'text-[var(--warning)]' },
-    { title: 'Unmapped Locations', value: unmappedLocations, icon: MapPin, color: 'text-[var(--danger)]' },
-    { title: 'Prayer Requests', value: prayerRequests, icon: Heart, color: 'text-pink-400' },
-  ]
+  // Find max count for progress bars
+  const maxStateCount = Math.max(...stateChartData.map(s => s.count), 1)
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-6">
       <PageHeader
         title="Admin Dashboard"
         description="Monitor organization-wide metrics, agent performance, and follow-up pipeline."
       />
 
-      {/* KPI Cards Row */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {kpis.map((kpi, idx) => (
-          <Card
-            key={idx}
-            className="bg-[var(--bg-surface)] border-[var(--border-default)] hover:border-[var(--gold-500)]/20 transition-all duration-300 shadow-sm"
-          >
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-[var(--text-secondary)] truncate">
-                  {kpi.title}
-                </span>
-                <kpi.icon className={`h-4 w-4 shrink-0 ${kpi.color}`} />
+      {/* Hero Row: Live Queue & Regional Load */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Live Queue */}
+        <Card className="lg:col-span-2 bg-[var(--bg-surface)] border-[var(--border-default)] rounded-[16px] shadow-sm overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between pb-4">
+            <CardTitle className="text-base font-semibold text-white">Live Queue</CardTitle>
+            <span className="bg-[var(--success-muted)]/30 text-[var(--success)] px-2.5 py-0.5 rounded-md text-xs font-semibold border border-[var(--success)]/20 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)] dot-pulse-green"></span>
+              {liveQueue.length} Active
+            </span>
+          </CardHeader>
+          <CardContent className="p-0">
+            {liveQueue.length > 0 ? (
+              <div className="divide-y divide-[var(--border-subtle)]">
+                {liveQueue.map((call) => {
+                  const contact = getSingle(call.contact)
+                  const isGreen = call.status === 'Active'
+                  const isYellow = call.status === 'On Hold'
+                  return (
+                    <div key={call.id} className="flex items-center justify-between px-6 py-4 hover:bg-[var(--bg-hover)] transition-colors">
+                      <div className="flex items-center gap-4">
+                        <div className="font-medium text-white">{contact?.phone || contact?.full_name}</div>
+                        <span className={`text-xs px-2 py-0.5 rounded-md font-semibold border ${
+                          isGreen ? 'bg-[var(--success-muted)]/30 text-[var(--success)] border-[var(--success)]/20' :
+                          isYellow ? 'bg-[var(--warning-muted)]/30 text-[var(--warning)] border-[var(--warning)]/20' :
+                          'bg-[var(--info-muted)]/30 text-[var(--info)] border-[var(--info)]/20'
+                        }`}>
+                          {call.status}
+                        </span>
+                        <div className="text-xs text-[var(--text-secondary)]">{contact?.state || 'Unknown'}</div>
+                      </div>
+                      <div className="font-mono text-white text-sm font-medium">{call.timer}</div>
+                    </div>
+                  )
+                })}
               </div>
-              <div className="mt-3">
-                <span className="text-2xl font-extrabold text-white tracking-tight">{kpi.value}</span>
+            ) : (
+              <div className="p-6 text-sm text-[var(--text-muted)] text-center">No active calls in queue.</div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Regional Load */}
+        <Card className="bg-[var(--bg-surface)] border-[var(--border-default)] rounded-[16px] shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-4">
+            <CardTitle className="text-base font-semibold text-white">Regional Load</CardTitle>
+            <Link href="/analytics" className="text-xs font-semibold text-[var(--gold-400)] hover:text-[var(--gold-300)] flex items-center">
+              View analytics <ArrowUpRight className="ml-0.5 w-3 h-3" />
+            </Link>
+          </CardHeader>
+          <CardContent className="px-6 pb-6 pt-0 space-y-4">
+            {stateChartData.length > 0 ? stateChartData.map((state, idx) => (
+              <div key={idx} className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-[var(--text-primary)] font-medium">{state.name}</span>
+                  <span className="font-mono text-[var(--text-secondary)]">{state.count}</span>
+                </div>
+                <div className="h-[5px] w-full bg-[#22252f] rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-[var(--gold-400)] rounded-full" 
+                    style={{ width: `${(state.count / maxStateCount) * 100}%` }}
+                  />
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        ))}
+            )) : (
+              <div className="text-sm text-[var(--text-muted)] text-center py-4">No regional data.</div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Agent Leaderboard / Performance Table */}
-      <Card className="bg-[var(--bg-surface)] border-[var(--border-default)]">
-        <CardHeader>
-          <CardTitle className="text-base font-bold text-white">Agent Performance</CardTitle>
-          <CardDescription className="text-xs text-[var(--text-secondary)]">
-            Summary of agent call statistics and assignment load. Click headers to sort.
-          </CardDescription>
+      {/* Compact Stat Strip */}
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-[16px] flex items-center divide-x divide-[var(--border-subtle)] shadow-sm">
+        <div className="flex-1 p-5">
+          <div className="text-xs text-[var(--text-secondary)] mb-1">Calls Today</div>
+          <div className="text-2xl font-mono text-white font-medium">{callsToday}</div>
+        </div>
+        <div className="flex-1 p-5">
+          <div className="text-xs text-[var(--text-secondary)] mb-1">Total Contacts</div>
+          <div className="text-2xl font-mono text-white font-medium">{totalContacts}</div>
+        </div>
+        <div className="flex-1 p-5">
+          <div className="text-xs text-[var(--text-secondary)] mb-1">Pending Follow-ups</div>
+          <div className="text-2xl font-mono text-white font-medium">{needingFollowup}</div>
+        </div>
+        <div className="flex-1 p-5">
+          <div className="text-xs text-[var(--text-secondary)] mb-1">Prayer Requests</div>
+          <div className="text-2xl font-mono text-white font-medium">{prayerRequests}</div>
+        </div>
+      </div>
+
+      {/* Recent Contacts Table */}
+      <Card className="bg-[var(--bg-surface)] border-[var(--border-default)] rounded-[16px] shadow-sm overflow-hidden">
+        <CardHeader className="flex flex-row items-center justify-between pb-4">
+          <CardTitle className="text-base font-semibold text-white">Recent Contacts</CardTitle>
+          <Link href="/contacts" className="text-xs font-semibold text-[var(--gold-400)] hover:text-[var(--gold-300)] flex items-center">
+            View all <ArrowUpRight className="ml-0.5 w-3 h-3" />
+          </Link>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
+          <table className="w-full text-left border-collapse text-sm zebra-rows">
             <thead>
-              <tr className="border-b border-[var(--border-default)] bg-[var(--bg-elevated)]/30">
-                <th className="p-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                  Agent Name
-                </th>
-                <th
-                  onClick={() => handleSort('contactsAssigned')}
-                  className="p-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
-                >
-                  <div className="flex items-center gap-1">
-                    Contacts Assigned <ArrowUpDown className="h-3 w-3" />
-                  </div>
-                </th>
-                <th
-                  onClick={() => handleSort('callsToday')}
-                  className="p-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
-                >
-                  <div className="flex items-center gap-1">
-                    Calls Today <ArrowUpDown className="h-3 w-3" />
-                  </div>
-                </th>
-                <th
-                  onClick={() => handleSort('callsThisWeek')}
-                  className="p-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
-                >
-                  <div className="flex items-center gap-1">
-                    Calls This Week <ArrowUpDown className="h-3 w-3" />
-                  </div>
-                </th>
-                <th
-                  onClick={() => handleSort('pendingFollowups')}
-                  className="p-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
-                >
-                  <div className="flex items-center gap-1">
-                    Pending Follow-ups <ArrowUpDown className="h-3 w-3" />
-                  </div>
-                </th>
+              <tr className="border-b border-[var(--border-subtle)]">
+                <th className="px-6 py-3 text-xs font-medium text-[var(--text-muted)]">Name</th>
+                <th className="px-6 py-3 text-xs font-medium text-[var(--text-muted)]">Region</th>
+                <th className="px-6 py-3 text-xs font-medium text-[var(--text-muted)]">Status</th>
+                <th className="px-6 py-3 text-xs font-medium text-[var(--text-muted)] text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--border-default)]">
-              {sortedAgents.map((agent) => (
-                <tr
-                  key={agent.id}
-                  className="hover:bg-[var(--bg-hover)]/40 transition-colors duration-200"
-                >
-                  <td className="p-4 font-bold text-white flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[var(--gold-400)]" />
-                    {agent.name}
-                  </td>
-                  <td className="p-4 text-white font-medium">{agent.contactsAssigned}</td>
-                  <td className="p-4 text-white font-medium">{agent.callsToday}</td>
-                  <td className="p-4 text-white font-medium">{agent.callsThisWeek}</td>
-                  <td className="p-4">
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                        agent.pendingFollowups > 0
-                          ? 'bg-[var(--warning-muted)]/30 text-[var(--warning)] border border-[var(--warning)]/20'
-                          : 'bg-[var(--border-default)] text-[var(--text-muted)]'
-                      }`}
-                    >
-                      {agent.pendingFollowups} pending
+            <tbody>
+              {recentContacts.map((contact) => (
+                <tr key={contact.id} className="hover:bg-[var(--bg-hover)] transition-colors">
+                  <td className="px-6 py-3 text-white font-medium">{contact.full_name || 'Unnamed'}</td>
+                  <td className="px-6 py-3 text-[var(--text-secondary)]">{contact.state || '-'}</td>
+                  <td className="px-6 py-3">
+                    <span className="text-xs px-2 py-0.5 rounded-md font-semibold border bg-[var(--border-default)] text-[var(--text-muted)]">
+                      {contact.call_status || 'New'}
                     </span>
+                  </td>
+                  <td className="px-6 py-3 text-right">
+                    <Link href={`/contacts/${contact.id}`} className="text-xs font-semibold text-[var(--gold-400)] hover:text-white transition-colors">
+                      View
+                    </Link>
                   </td>
                 </tr>
               ))}
-              {sortedAgents.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="p-8 text-center text-sm text-[var(--text-muted)]">
-                    No active agents found in the registry.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </CardContent>
       </Card>
 
-      {/* Graphical Insights Row */}
+      {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 30 Days Calls Trend Line Chart */}
-        <Card className="bg-[var(--bg-surface)] border-[var(--border-default)]">
+        <Card className="bg-[var(--bg-surface)] border-[var(--border-default)] rounded-[16px] shadow-sm">
           <CardHeader>
-            <CardTitle className="text-base font-bold text-white">Call Volume Trend</CardTitle>
+            <CardTitle className="text-base font-semibold text-white">Call Volume Trend</CardTitle>
             <CardDescription className="text-xs text-[var(--text-secondary)]">
               Total logged calls per day over the last 30 days
             </CardDescription>
@@ -567,7 +449,7 @@ export default function AdminDashboard() {
                     contentStyle={{
                       backgroundColor: 'var(--bg-elevated)',
                       borderColor: 'var(--border-default)',
-                      borderRadius: '8px',
+                      borderRadius: '12px',
                     }}
                     labelStyle={{ color: 'var(--text-primary)', fontWeight: 'bold' }}
                     itemStyle={{ color: 'var(--gold-400)' }}
@@ -590,63 +472,14 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Contacts by State Horizontal Bar Chart */}
-        <Card className="bg-[var(--bg-surface)] border-[var(--border-default)]">
+        <Card className="bg-[var(--bg-surface)] border-[var(--border-default)] rounded-[16px] shadow-sm">
           <CardHeader>
-            <CardTitle className="text-base font-bold text-white">Top 10 States</CardTitle>
+            <CardTitle className="text-base font-semibold text-white">Status Pipeline by Agent</CardTitle>
             <CardDescription className="text-xs text-[var(--text-secondary)]">
-              Geographic distribution of all registered contacts
+              Breakdown of contact status assignments
             </CardDescription>
           </CardHeader>
           <CardContent className="h-[280px] pr-4">
-            {mounted && stateChartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={stateChartData}
-                  layout="vertical"
-                  margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
-                >
-                  <XAxis type="number" stroke="var(--text-muted)" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis
-                    dataKey="name"
-                    type="category"
-                    stroke="var(--text-muted)"
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={false}
-                    width={90}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'var(--bg-elevated)',
-                      borderColor: 'var(--border-default)',
-                      borderRadius: '8px',
-                    }}
-                    itemStyle={{ color: 'var(--text-primary)' }}
-                  />
-                  <Bar dataKey="count" fill="var(--info)" radius={[0, 4, 4, 0]} maxBarSize={20} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex h-full items-center justify-center text-sm text-[var(--text-muted)]">
-                No geographic state data found.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Stacked Agent Pipeline Chart & Feed Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Status Pipeline per Agent Stacked Bar Chart */}
-        <Card className="lg:col-span-2 bg-[var(--bg-surface)] border-[var(--border-default)]">
-          <CardHeader>
-            <CardTitle className="text-base font-bold text-white">Status Pipeline by Agent</CardTitle>
-            <CardDescription className="text-xs text-[var(--text-secondary)]">
-              Breakdown of contact status assignments for each agent
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="h-[320px] pr-4">
             {mounted && pipelineChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={pipelineChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -668,7 +501,7 @@ export default function AdminDashboard() {
                     contentStyle={{
                       backgroundColor: 'var(--bg-elevated)',
                       borderColor: 'var(--border-default)',
-                      borderRadius: '8px',
+                      borderRadius: '12px',
                     }}
                     labelStyle={{ color: 'var(--text-primary)', fontWeight: 'bold' }}
                   />
@@ -687,55 +520,55 @@ export default function AdminDashboard() {
             )}
           </CardContent>
         </Card>
+      </div>
 
-        {/* Global Recent Activity Feed */}
-        <Card className="bg-[var(--bg-surface)] border-[var(--border-default)]">
-          <CardHeader>
-            <CardTitle className="text-base font-bold text-white">Organization Activity</CardTitle>
-            <CardDescription className="text-xs text-[var(--text-secondary)]">
-              Latest events logged across the organization
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0 max-h-[320px] overflow-y-auto">
-            {activities.length > 0 ? (
-              <div className="divide-y divide-[var(--border-default)]">
-                {activities.map((act) => (
-                  <div key={act.id} className="p-4 hover:bg-[var(--bg-hover)]/30 transition-colors">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="space-y-1">
-                        <p className="text-xs font-bold text-white line-clamp-2">{act.title}</p>
-                        <p className="text-[11px] text-[var(--text-secondary)]">{act.subtitle}</p>
-                        {act.notes && (
-                          <p className="text-[11px] text-[var(--text-muted)] italic max-w-sm line-clamp-1">
-                            "{act.notes}"
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className="text-[10px] text-[var(--text-muted)]">
-                          {mounted ? formatDistanceToNow(parseISO(act.timestamp), { addSuffix: false }) : ''}
-                        </span>
-                        {act.contactId && (
-                          <Link
-                            href={`/contacts/${act.contactId}`}
-                            className="p-0.5 rounded-full hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-white transition-colors"
-                          >
-                            <ChevronRight className="h-3.5 w-3.5" />
-                          </Link>
-                        )}
-                      </div>
+      {/* Activity Feed */}
+      <Card className="bg-[var(--bg-surface)] border-[var(--border-default)] rounded-[16px] shadow-sm overflow-hidden">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold text-white">Organization Activity</CardTitle>
+          <CardDescription className="text-xs text-[var(--text-secondary)]">
+            Latest events logged across the organization
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          {activities.length > 0 ? (
+            <div className="divide-y divide-[var(--border-subtle)]">
+              {activities.map((act) => (
+                <div key={act.id} className="p-4 hover:bg-[var(--bg-hover)] transition-colors">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-white line-clamp-1">{act.title}</p>
+                      <p className="text-xs text-[var(--text-secondary)]">{act.subtitle}</p>
+                      {act.notes && (
+                        <p className="text-xs text-[var(--text-muted)] italic max-w-2xl line-clamp-1 mt-1">
+                          "{act.notes}"
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-xs text-[var(--text-muted)]">
+                        {mounted ? formatDistanceToNow(parseISO(act.timestamp), { addSuffix: true }) : ''}
+                      </span>
+                      {act.contactId && (
+                        <Link
+                          href={`/contacts/${act.contactId}`}
+                          className="p-1.5 rounded-full hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-white transition-colors"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Link>
+                      )}
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="py-8 text-center text-sm text-[var(--text-muted)]">
-                No organization activities found.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-8 text-center text-sm text-[var(--text-muted)]">
+              No organization activities found.
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

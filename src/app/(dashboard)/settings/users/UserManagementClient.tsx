@@ -6,6 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
@@ -171,7 +178,7 @@ export default function UserManagementClient() {
                     <Input
                       id="email"
                       type="email"
-                      placeholder="jane@vanguard.com"
+                      placeholder="jane@loveworldindia.org"
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -203,18 +210,20 @@ export default function UserManagementClient() {
                 <div className="space-y-1.5">
                   <Label htmlFor="role" className="text-xs font-semibold text-[var(--text-secondary)]">System Access Role</Label>
                   <div className="relative">
-                    <Shield className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-                    <select
-                      id="role"
+                    <Shield className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)] z-10 pointer-events-none" />
+                    <Select
                       value={role}
-                      onChange={(e) => setRole(e.target.value as 'admin' | 'agent')}
-                      className="pl-10 pr-10 h-9 w-full rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)] text-sm text-white placeholder-[var(--text-muted)] focus:border-[var(--gold-500)] focus:ring-3 focus:ring-[var(--gold-500)]/20 outline-none transition-colors appearance-none cursor-pointer"
+                      onValueChange={(val) => setRole(val as 'admin' | 'agent')}
                       disabled={submitting}
                     >
-                      <option value="agent">Call Agent</option>
-                      <option value="admin">System Administrator</option>
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)] pointer-events-none" />
+                      <SelectTrigger className="w-full bg-[var(--bg-elevated)] border-[var(--border-default)] text-white focus:border-[var(--gold-500)] pl-10 h-9">
+                        <SelectValue placeholder="Select Access Role" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[var(--bg-surface)] border-[var(--border-default)]">
+                        <SelectItem value="agent">Call Agent</SelectItem>
+                        <SelectItem value="admin">System Administrator</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 

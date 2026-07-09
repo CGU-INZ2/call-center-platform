@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import PrayersClient from './PrayersClient'
 
 export const metadata = {
-  title: 'Prayer Requests | MinistryCC',
+  title: 'Prayer Requests | INZ2 Call Center',
   description: 'View and manage all prayer requests and testimonies from contacts.',
 }
 

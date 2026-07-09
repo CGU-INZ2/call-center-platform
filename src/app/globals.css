@@ -8,7 +8,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-mono: var(--font-jbmono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -48,8 +48,61 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ─── Keyframes — exactly 3, all functional ─────────────────────────────────── */
+
+/* Live call dot — the ONE decorative pulse in the entire app */
+@keyframes pulse-gold {
+  0%   { box-shadow: 0 0 0 0 rgba(212, 168, 83, 0.45); }
+  70%  { box-shadow: 0 0 0 6px rgba(212, 168, 83, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(212, 168, 83, 0); }
+}
+
+/* Active call / agent availability — operational signal */
+@keyframes pulse-green {
+  0%   { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.45); }
+  70%  { box-shadow: 0 0 0 5px rgba(52, 211, 153, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+}
+
+/* Login page mesh gradient — brand moment only */
+@keyframes mesh-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ─── Utility classes ─────────────────────────────────────────────────────────── */
+
+/* Pulse dots — applied only to operational status indicators */
+.dot-pulse-gold {
+  animation: pulse-gold 2s infinite;
+}
+
+.dot-pulse-green {
+  animation: pulse-green 1.6s infinite;
+}
+
+/* Zebra table rows */
+.zebra-rows tr:nth-child(even) {
+  background: #1f222b;
+}
+
+/* Login mesh background */
+.mesh-bg {
+  background: linear-gradient(
+    135deg,
+    #0f1117 0%,
+    #1a1d25 25%,
+    #2a1f0f 50%,
+    #1a1025 75%,
+    #0f1117 100%
+  );
+  background-size: 400% 400%;
+  animation: mesh-shift 12s ease infinite;
+}
+
+/* ─── Root tokens ─────────────────────────────────────────────────────────────── */
 :root {
-  /* Design System Tokens */
   /* Backgrounds */
   --bg-root: #0f1117;
   --bg-surface: #1a1d25;
@@ -90,8 +143,8 @@
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
   --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
   --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
-  --shadow-glow: 0 0 20px rgba(212,168,83,0.15);
 
+  /* Shadcn defaults */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -127,6 +180,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -160,6 +214,7 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* ─── Base styles ─────────────────────────────────────────────────────────────── */
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -171,5 +226,21 @@
   }
   html {
     @apply font-sans;
+  }
+
+  /* Dark scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--bg-surface);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-default);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3a3d4a;
   }
 }

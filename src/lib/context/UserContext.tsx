@@ -84,6 +84,46 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  // Inactivity / Idle Auto-logout check (30 minutes)
+  useEffect(() => {
+    if (!user) return
+
+    const INACTIVITY_TIMEOUT = 30 * 60 * 1000 // 30 minutes
+    let timeoutId: NodeJS.Timeout
+
+    const handleSignOut = async () => {
+      console.log('Session idle. Logging out...')
+      try {
+        await supabase.auth.signOut()
+      } catch (err) {
+        console.error('Error signing out during idle check:', err)
+      }
+      // Force full reload/redirect to login page with idle reason
+      window.location.href = '/login?reason=idle'
+    }
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId)
+      timeoutId = setTimeout(handleSignOut, INACTIVITY_TIMEOUT)
+    }
+
+    // Set initial timer
+    resetTimer()
+
+    // Activity listeners
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart']
+    events.forEach((event) => {
+      window.addEventListener(event, resetTimer)
+    })
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId)
+      events.forEach((event) => {
+        window.removeEventListener(event, resetTimer)
+      })
+    }
+  }, [user])
+
   return (
     <UserContext.Provider value={{ user, profile, loading, refresh: fetchUserAndProfile }}>
       {children}

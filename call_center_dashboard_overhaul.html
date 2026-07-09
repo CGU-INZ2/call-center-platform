@@ -1,0 +1,184 @@
+<h2 style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">Redesigned call center dashboard mockup: live call queue, regional load ranking, key stats, and recent contacts, in a dark navy and gold theme.</h2>
+<style>
+@keyframes pulseGold{0%{box-shadow:0 0 0 0 rgba(212,168,83,.45)}70%{box-shadow:0 0 0 6px rgba(212,168,83,0)}100%{box-shadow:0 0 0 0 rgba(212,168,83,0)}}
+@keyframes pulseGreen{0%{box-shadow:0 0 0 0 rgba(52,211,153,.45)}70%{box-shadow:0 0 0 5px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
+.navitem:hover{background:#282c38}
+.zebra tr:nth-child(even){background:#1f222b}
+.linklike:hover{text-decoration:underline}
+</style>
+<div style="background:var(--surface-1);border:0.5px solid var(--border);border-radius:12px;overflow:hidden;">
+  <div style="height:34px;display:flex;align-items:center;padding:0 12px;gap:6px;border-bottom:0.5px solid var(--border);">
+    <span style="width:8px;height:8px;border-radius:50%;background:var(--border-strong);display:inline-block;"></span>
+    <span style="width:8px;height:8px;border-radius:50%;background:var(--border-strong);display:inline-block;"></span>
+    <span style="width:8px;height:8px;border-radius:50%;background:var(--border-strong);display:inline-block;"></span>
+    <span style="font-size:12px;color:var(--text-muted);background:var(--surface-2);padding:3px 10px;border-radius:6px;margin-left:8px;">vibeforge.in/dashboard</span>
+  </div>
+  <div style="background:#0f1117;display:flex;font-family:'Inter',system-ui,sans-serif;">
+    <div style="width:152px;flex-shrink:0;background:#1a1d25;border-right:1px solid #2a2d38;padding:16px 10px;display:flex;flex-direction:column;gap:3px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:18px;padding:0 4px;">
+        <div style="width:26px;height:26px;border-radius:7px;background:#d4a853;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="ti ti-headset" aria-hidden="true" style="font-size:14px;color:#0f1117;"></i></div>
+        <span style="font-size:12px;font-weight:600;color:#e8e9ed;">Call center</span>
+      </div>
+      <div class="navitem" style="display:flex;align-items:center;gap:8px;padding:7px 7px;border-radius:0;background:#282c38;border-left:3px solid #d4a853;color:#e8e9ed;font-size:12px;">
+        <i class="ti ti-layout-dashboard" aria-hidden="true" style="font-size:15px;"></i>Dashboard
+      </div>
+      <div class="navitem" style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;color:#8b8fa3;font-size:12px;cursor:pointer;">
+        <i class="ti ti-users" aria-hidden="true" style="font-size:15px;"></i>Contacts
+      </div>
+      <div class="navitem" style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;color:#8b8fa3;font-size:12px;cursor:pointer;">
+        <i class="ti ti-phone" aria-hidden="true" style="font-size:15px;"></i>Calls
+      </div>
+      <div class="navitem" style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;color:#8b8fa3;font-size:12px;cursor:pointer;">
+        <i class="ti ti-chart-bar" aria-hidden="true" style="font-size:15px;"></i>Analytics
+      </div>
+      <div class="navitem" style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;color:#8b8fa3;font-size:12px;cursor:pointer;">
+        <i class="ti ti-settings" aria-hidden="true" style="font-size:15px;"></i>Settings
+      </div>
+      <div style="margin-top:auto;border-top:1px solid #2a2d38;padding-top:10px;display:flex;align-items:center;gap:8px;">
+        <div style="width:26px;height:26px;border-radius:50%;background:#282c38;color:#d4a853;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;">SP</div>
+        <div>
+          <div style="font-size:11px;color:#e8e9ed;">Agent view</div>
+          <div style="font-size:11px;color:#34d399;display:flex;align-items:center;gap:4px;"><span style="width:5px;height:5px;border-radius:50%;background:#34d399;display:inline-block;"></span>Available</div>
+        </div>
+      </div>
+    </div>
+    <div style="flex:1;min-width:0;padding:16px;display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:16px;font-weight:600;color:#e8e9ed;">Dashboard</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="display:inline-flex;align-items:center;gap:6px;background:#22252f;border:1px solid #2a2d38;padding:4px 10px;border-radius:9999px;font-size:11px;color:#8b8fa3;">
+            <span style="width:6px;height:6px;border-radius:50%;background:#d4a853;display:inline-block;animation:pulseGold 2s infinite;"></span>
+            <span id="queueCount" style="font-family:'JetBrains Mono',monospace;color:#e8e9ed;font-weight:500;">14</span> in queue
+          </span>
+          <i class="ti ti-search" aria-hidden="true" style="font-size:15px;color:#8b8fa3;"></i>
+          <i class="ti ti-bell" aria-hidden="true" style="font-size:15px;color:#8b8fa3;"></i>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:minmax(230px,1.3fr) minmax(180px,1fr);gap:12px;">
+        <div style="background:#1a1d25;border:1px solid #2a2d38;border-radius:12px;padding:14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <span style="font-size:12px;font-weight:600;color:#e8e9ed;">Live queue</span>
+            <span style="font-size:11px;padding:2px 8px;border-radius:9999px;background:rgba(52,211,153,.15);color:#34d399;">3 active</span>
+          </div>
+          <div style="display:flex;flex-direction:column;">
+            <div style="padding:7px 0;border-bottom:1px solid #1f222b;display:flex;flex-direction:column;gap:3px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-size:12px;color:#e8e9ed;">+91 98765 43210</span>
+                <span style="font-size:11px;padding:1px 7px;border-radius:9999px;background:rgba(52,211,153,.15);color:#34d399;display:flex;align-items:center;gap:4px;"><span style="width:5px;height:5px;border-radius:50%;background:#34d399;display:inline-block;animation:pulseGreen 1.6s infinite;"></span>Active</span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-size:11px;color:#8b8fa3;"><i class="ti ti-map-pin" aria-hidden="true" style="font-size:11px;vertical-align:-1px;"></i> Nashik, MH</span>
+                <span style="font-size:11px;color:#8b8fa3;font-family:'JetBrains Mono',monospace;" id="dur1">00:42</span>
+              </div>
+            </div>
+            <div style="padding:7px 0;border-bottom:1px solid #1f222b;display:flex;flex-direction:column;gap:3px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-size:12px;color:#e8e9ed;">+91 88990 11223</span>
+                <span style="font-size:11px;padding:1px 7px;border-radius:9999px;background:rgba(96,165,250,.15);color:#60a5fa;">Ringing</span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-size:11px;color:#8b8fa3;"><i class="ti ti-map-pin" aria-hidden="true" style="font-size:11px;vertical-align:-1px;"></i> Pune, MH</span>
+                <span style="font-size:11px;color:#8b8fa3;font-family:'JetBrains Mono',monospace;" id="dur2">00:05</span>
+              </div>
+            </div>
+            <div style="padding:7px 0;border-bottom:1px solid #1f222b;display:flex;flex-direction:column;gap:3px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-size:12px;color:#e8e9ed;">+91 70123 45678</span>
+                <span style="font-size:11px;padding:1px 7px;border-radius:9999px;background:rgba(251,191,36,.15);color:#fbbf24;">On hold</span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-size:11px;color:#8b8fa3;"><i class="ti ti-map-pin" aria-hidden="true" style="font-size:11px;vertical-align:-1px;"></i> Nagpur, MH</span>
+                <span style="font-size:11px;color:#8b8fa3;font-family:'JetBrains Mono',monospace;">03:12</span>
+              </div>
+            </div>
+            <div style="padding:7px 0 0;display:flex;flex-direction:column;gap:3px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-size:12px;color:#e8e9ed;">Unknown number</span>
+                <span style="font-size:11px;padding:1px 7px;border-radius:9999px;background:rgba(96,165,250,.15);color:#60a5fa;">Ringing</span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-size:11px;color:#8b8fa3;">—</span>
+                <span style="font-size:11px;color:#8b8fa3;font-family:'JetBrains Mono',monospace;" id="dur3">00:02</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="background:#1a1d25;border:1px solid #2a2d38;border-radius:12px;padding:14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <span style="font-size:12px;font-weight:600;color:#e8e9ed;">Regional load</span>
+            <span class="linklike" onclick="sendPrompt('Design the Analytics page with the full geographic call heatmap using react-simple-maps')" style="font-size:11px;color:#d4a853;cursor:pointer;">View analytics ↗</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:9px;">
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:11px;color:#e8e9ed;">Maharashtra</span><span style="font-size:11px;color:#8b8fa3;font-family:'JetBrains Mono',monospace;">42</span></div>
+              <div style="height:5px;border-radius:9999px;background:#22252f;overflow:hidden;"><div style="height:100%;width:100%;background:#d4a853;"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:11px;color:#e8e9ed;">Delhi NCR</span><span style="font-size:11px;color:#8b8fa3;font-family:'JetBrains Mono',monospace;">27</span></div>
+              <div style="height:5px;border-radius:9999px;background:#22252f;overflow:hidden;"><div style="height:100%;width:64%;background:#d4a853;"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:11px;color:#e8e9ed;">Karnataka</span><span style="font-size:11px;color:#8b8fa3;font-family:'JetBrains Mono',monospace;">19</span></div>
+              <div style="height:5px;border-radius:9999px;background:#22252f;overflow:hidden;"><div style="height:100%;width:45%;background:#d4a853;"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:11px;color:#e8e9ed;">Gujarat</span><span style="font-size:11px;color:#8b8fa3;font-family:'JetBrains Mono',monospace;">14</span></div>
+              <div style="height:5px;border-radius:9999px;background:#22252f;overflow:hidden;"><div style="height:100%;width:33%;background:#d4a853;"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:11px;color:#e8e9ed;">Others</span><span style="font-size:11px;color:#8b8fa3;font-family:'JetBrains Mono',monospace;">9</span></div>
+              <div style="height:5px;border-radius:9999px;background:#22252f;overflow:hidden;"><div style="height:100%;width:21%;background:#d4a853;"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;background:#1a1d25;border:1px solid #2a2d38;border-radius:12px;padding:12px 16px;">
+        <div style="flex:1;border-right:1px solid #2a2d38;"><div style="font-size:11px;color:#8b8fa3;">Calls today</div><div style="font-size:16px;font-weight:500;color:#e8e9ed;font-family:'JetBrains Mono',monospace;">128</div></div>
+        <div style="flex:1;border-right:1px solid #2a2d38;padding-left:14px;"><div style="font-size:11px;color:#8b8fa3;">Avg wait</div><div style="font-size:16px;font-weight:500;color:#e8e9ed;font-family:'JetBrains Mono',monospace;">1m 42s</div></div>
+        <div style="flex:1;border-right:1px solid #2a2d38;padding-left:14px;"><div style="font-size:11px;color:#8b8fa3;">Resolved</div><div style="font-size:16px;font-weight:500;color:#e8e9ed;font-family:'JetBrains Mono',monospace;">96%</div></div>
+        <div style="flex:1;padding-left:14px;"><div style="font-size:11px;color:#8b8fa3;">Missed</div><div style="font-size:16px;font-weight:500;color:#f87171;font-family:'JetBrains Mono',monospace;">4</div></div>
+      </div>
+      <div style="background:#1a1d25;border:1px solid #2a2d38;border-radius:12px;padding:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span style="font-size:12px;font-weight:600;color:#e8e9ed;">Recent contacts</span>
+          <span class="linklike" onclick="sendPrompt('Design the Contacts page for the call center app')" style="font-size:11px;color:#d4a853;cursor:pointer;">View all ↗</span>
+        </div>
+        <table class="zebra" style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;">
+          <tr style="color:#8b8fa3;">
+            <td style="padding:5px 6px;border-bottom:1px solid #2a2d38;">Name</td>
+            <td style="padding:5px 6px;border-bottom:1px solid #2a2d38;">Last contact</td>
+            <td style="padding:5px 6px;border-bottom:1px solid #2a2d38;">Region</td>
+            <td style="padding:5px 6px;border-bottom:1px solid #2a2d38;text-align:right;">Action</td>
+          </tr>
+          <tr>
+            <td style="padding:6px;color:#e8e9ed;">Prakash Deshmukh</td>
+            <td style="padding:6px;color:#8b8fa3;">Today</td>
+            <td style="padding:6px;color:#8b8fa3;">Nashik, MH</td>
+            <td style="padding:6px;text-align:right;color:#d4a853;">View</td>
+          </tr>
+          <tr>
+            <td style="padding:6px;color:#e8e9ed;">Anita Kulkarni</td>
+            <td style="padding:6px;color:#8b8fa3;">Yesterday</td>
+            <td style="padding:6px;color:#8b8fa3;">Pune, MH</td>
+            <td style="padding:6px;text-align:right;color:#d4a853;">View</td>
+          </tr>
+          <tr>
+            <td style="padding:6px;color:#e8e9ed;">Suresh Rathod</td>
+            <td style="padding:6px;color:#8b8fa3;">2 days ago</td>
+            <td style="padding:6px;color:#8b8fa3;">Nagpur, MH</td>
+            <td style="padding:6px;text-align:right;color:#d4a853;">View</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  var s=[42,5,2],els=[document.getElementById('dur1'),document.getElementById('dur2'),document.getElementById('dur3')];
+  function fmt(t){var m=Math.floor(t/60),sec=t%60;return (m<10?'0':'')+m+':'+(sec<10?'0':'')+sec;}
+  setInterval(function(){
+    for(var i=0;i<3;i++){s[i]++;if(els[i])els[i].textContent=fmt(s[i]);}
+  },1000);
+})();
+</script>

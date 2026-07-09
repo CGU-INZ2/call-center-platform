@@ -20,6 +20,13 @@ import {
   Languages,
   Check
 } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface Category {
   id: number
@@ -532,38 +539,52 @@ export default function ContactForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="category" className="text-xs font-semibold text-[var(--text-secondary)]">Category / Lead Status</Label>
-              <select
-                id="category"
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="h-9 w-full rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)] px-3 text-sm text-white outline-none focus:border-[var(--gold-500)] cursor-pointer"
+              <Select
+                value={categoryId || 'none'}
+                onValueChange={(val) => setCategoryId(val === 'none' ? '' : (val || ''))}
               >
-                <option value="">Select Category...</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id.toString()}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="h-9 w-full bg-[var(--bg-elevated)] border-[var(--border-default)] text-white focus:border-[var(--gold-500)] cursor-pointer">
+                  <SelectValue placeholder="Select Category...">
+                    {categoryId && categoryId !== 'none'
+                      ? categories.find(c => c.id.toString() === categoryId)?.label
+                      : 'Select Category...'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="bg-[var(--bg-surface)] border-[var(--border-default)]">
+                  <SelectItem value="none">Select Category...</SelectItem>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id.toString()}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Assigned Agent (Admin Only) */}
             <div className="space-y-1.5">
               <Label htmlFor="agent" className="text-xs font-semibold text-[var(--text-secondary)]">Assigned Agent</Label>
               {userRole === 'admin' ? (
-                <select
-                  id="agent"
-                  value={assignedAgentId}
-                  onChange={(e) => setAssignedAgentId(e.target.value)}
-                  className="h-9 w-full rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)] px-3 text-sm text-white outline-none focus:border-[var(--gold-500)] cursor-pointer"
+                <Select
+                  value={assignedAgentId || 'unassigned'}
+                  onValueChange={(val) => setAssignedAgentId(val === 'unassigned' ? '' : (val || ''))}
                 >
-                  <option value="">Unassigned</option>
-                  {agents.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.full_name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="h-9 w-full bg-[var(--bg-elevated)] border-[var(--border-default)] text-white focus:border-[var(--gold-500)] cursor-pointer">
+                    <SelectValue placeholder="Unassigned">
+                      {assignedAgentId && assignedAgentId !== 'unassigned'
+                        ? agents.find(a => a.id === assignedAgentId)?.full_name
+                        : 'Unassigned'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="bg-[var(--bg-surface)] border-[var(--border-default)]">
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {agents.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               ) : (
                 <div className="h-9 w-full rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)]/50 px-3 flex items-center text-sm text-[var(--text-secondary)]">
                   {contact?.agent?.full_name || agents.find(a => a.id === contact?.assigned_agent_id)?.full_name || 'Self (Assigned)'}
@@ -573,20 +594,23 @@ export default function ContactForm({
 
             <div className="space-y-1.5">
               <Label htmlFor="callStatus" className="text-xs font-semibold text-[var(--text-secondary)]">Call Status</Label>
-              <select
-                id="callStatus"
+              <Select
                 value={callStatus}
-                onChange={(e) => setCallStatus(e.target.value)}
-                className="h-9 w-full rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)] px-3 text-sm text-white outline-none focus:border-[var(--gold-500)] cursor-pointer"
+                onValueChange={(val) => setCallStatus(val ?? 'New')}
               >
-                <option value="New">New</option>
-                <option value="Attempted">Attempted</option>
-                <option value="Connected">Connected</option>
-                <option value="Busy">Busy</option>
-                <option value="No Answer">No Answer</option>
-                <option value="Wrong Number">Wrong Number</option>
-                <option value="Disconnected">Disconnected</option>
-              </select>
+                <SelectTrigger className="h-9 w-full bg-[var(--bg-elevated)] border-[var(--border-default)] text-white focus:border-[var(--gold-500)] cursor-pointer">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[var(--bg-surface)] border-[var(--border-default)]">
+                  <SelectItem value="New">New</SelectItem>
+                  <SelectItem value="Attempted">Attempted</SelectItem>
+                  <SelectItem value="Connected">Connected</SelectItem>
+                  <SelectItem value="Busy">Busy</SelectItem>
+                  <SelectItem value="No Answer">No Answer</SelectItem>
+                  <SelectItem value="Wrong Number">Wrong Number</SelectItem>
+                  <SelectItem value="Disconnected">Disconnected</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-1.5">

@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import FollowupsClient, { type Followup } from './FollowupsClient'
 
 export const metadata = {
-  title: 'Follow-ups | Vanguard Call Center',
+  title: 'Follow-ups | Loveworld India Call Center',
   description: 'Manage and review your pending follow-up calls',
 }
 

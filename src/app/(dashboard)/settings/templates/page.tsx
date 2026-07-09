@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import TemplatesClient from './TemplatesClient'
 
 export const metadata = {
-  title: 'WhatsApp Templates | MinistryCC',
+  title: 'WhatsApp Templates | INZ2 Call Center',
   description: 'Manage reusable WhatsApp message templates.',
 }
 
