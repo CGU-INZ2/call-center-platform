@@ -19,6 +19,7 @@ export function Sidebar() {
     { icon: Users, label: 'Contacts', href: '/contacts' },
     { icon: Clock, label: 'Follow-ups', href: '/followups' },
     { icon: Heart, label: 'Prayers', href: '/prayers' },
+    { icon: BarChart2, label: 'Analytics', href: '/analytics' },
     ...(isAdmin ? [
       { icon: Upload, label: 'Import Contacts', href: '/settings/import' },
       { icon: Settings, label: 'WA Templates', href: '/settings/templates' },
