@@ -36,9 +36,9 @@ export default async function ContactsPage() {
     console.error('Error fetching categories:', catError)
   }
 
-  // 4. Fetch agents (if Admin)
+  // 4. Fetch agents (if Admin or Superadmin)
   let agents: { id: string; full_name: string }[] = []
-  if (userRole === 'admin') {
+  if (userRole === 'admin' || userRole === 'superadmin') {
     const { data: agentsData, error: agentsError } = await supabase
       .from('profiles')
       .select('id, full_name')

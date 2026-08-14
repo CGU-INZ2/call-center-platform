@@ -20,7 +20,7 @@ export default async function ImportSettingsPage() {
     .eq('id', user.id)
     .single()
 
-  if (error || !profile || profile.role !== 'admin') {
+  if (error || !profile || (profile.role !== 'admin' && profile.role !== 'superadmin')) {
     redirect('/')
   }
 

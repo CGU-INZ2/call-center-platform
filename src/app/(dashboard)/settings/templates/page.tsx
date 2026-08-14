@@ -19,8 +19,8 @@ export default async function TemplatesPage() {
     .eq('id', user.id)
     .single()
 
-  // Admin-only page
-  if (!profile || profile.role !== 'admin') redirect('/')
+  // Admin & Superadmin page
+  if (!profile || (profile.role !== 'admin' && profile.role !== 'superadmin')) redirect('/')
 
   return <TemplatesClient />
 }

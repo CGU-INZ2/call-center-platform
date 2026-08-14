@@ -42,7 +42,7 @@ export interface Followup {
 
 interface FollowupsClientProps {
   followups: Followup[]
-  userRole: 'admin' | 'agent'
+  userRole: 'superadmin' | 'admin' | 'agent'
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

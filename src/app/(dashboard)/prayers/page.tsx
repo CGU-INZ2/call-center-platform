@@ -19,7 +19,7 @@ export default async function PrayersPage() {
     .eq('id', user.id)
     .single()
 
-  const isAdmin = profileData?.role === 'admin'
+  const isAdmin = profileData?.role === 'admin' || profileData?.role === 'superadmin'
 
   const { data: prayers, error } = await supabase
     .from('prayer_requests')

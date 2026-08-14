@@ -19,7 +19,7 @@ export async function GET() {
       .eq('id', adminUser.id)
       .single()
 
-    if (profileError || !profile || profile.role !== 'admin') {
+    if (profileError || !profile || (profile.role !== 'admin' && profile.role !== 'superadmin')) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 })
     }
 

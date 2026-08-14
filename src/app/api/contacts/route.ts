@@ -43,7 +43,7 @@ export async function GET(request: Request) {
     // We explicitly append the filter to ensure pagination count matches what the agent is allowed to see.
     if (profile.role === 'agent') {
       query = query.eq('assigned_agent_id', user.id)
-    } else if (profile.role === 'admin') {
+    } else if (profile.role === 'admin' || profile.role === 'superadmin') {
       if (assigned_agent_id) {
         if (assigned_agent_id === 'unassigned') {
           query = query.is('assigned_agent_id', null)
