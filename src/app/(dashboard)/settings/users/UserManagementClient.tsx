@@ -15,6 +15,14 @@ import {
 } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { 
   Loader2, 
@@ -25,8 +33,8 @@ import {
   User as UserIcon, 
   Calendar, 
   Search, 
-  CheckCircle2, 
-  AlertCircle
+  Trash2,
+  AlertTriangle
 } from 'lucide-react'
 import { useUser } from '@/lib/context/UserContext'
 
@@ -49,6 +57,10 @@ export default function UserManagementClient() {
   const [searchQuery, setSearchQuery] = useState('')
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null)
   
+  // Deletion modal state
+  const [userToDelete, setUserToDelete] = useState<UserRecord | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
   // Form states
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -158,6 +170,38 @@ export default function UserManagementClient() {
       toast.error(err.message || 'Failed to update access role.')
     } finally {
       setUpdatingUserId(null)
+    }
+  }
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return
+
+    if (currentUser?.id === userToDelete.id) {
+      toast.error('You cannot delete your own administrator account.')
+      setUserToDelete(null)
+      return
+    }
+
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/admin/users/${userToDelete.id}`, {
+        method: 'DELETE',
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete user')
+      }
+
+      // Optimistically remove from state
+      setUsers((prev) => prev.filter((u) => u.id !== userToDelete.id))
+      toast.success(`Removed account for ${userToDelete.full_name}.`)
+      setUserToDelete(null)
+    } catch (err: any) {
+      console.error('Error deleting user:', err)
+      toast.error(err.message || 'Failed to delete user account.')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -319,6 +363,7 @@ export default function UserManagementClient() {
                     <TableHead className="text-[var(--text-muted)] font-semibold py-3 px-4 text-xs tracking-wider uppercase">Access Role</TableHead>
                     <TableHead className="text-[var(--text-muted)] font-semibold py-3 px-4 text-xs tracking-wider uppercase">Account Status</TableHead>
                     <TableHead className="text-[var(--text-muted)] font-semibold py-3 px-4 text-xs tracking-wider uppercase">Registration</TableHead>
+                    <TableHead className="text-[var(--text-muted)] font-semibold py-3 px-4 text-xs tracking-wider uppercase text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -343,11 +388,14 @@ export default function UserManagementClient() {
                         <TableCell className="py-4 px-4">
                           <div className="h-4 w-24 bg-[var(--bg-elevated)] rounded" />
                         </TableCell>
+                        <TableCell className="py-4 px-4 text-right">
+                          <div className="h-7 w-7 bg-[var(--bg-elevated)] rounded ml-auto" />
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : filteredUsers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="py-8 text-center text-[var(--text-secondary)]">
+                      <TableCell colSpan={5} className="py-8 text-center text-[var(--text-secondary)]">
                         No team members found. Try refining your search query.
                       </TableCell>
                     </TableRow>
@@ -481,6 +529,23 @@ export default function UserManagementClient() {
                               {formattedDate}
                             </div>
                           </TableCell>
+
+                          {/* Actions: Delete Account */}
+                          <TableCell className="py-3.5 px-4 text-right">
+                            {isCurrentLoggedInUser ? (
+                              <span className="text-xs text-[var(--text-muted)] italic">—</span>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setUserToDelete(user)}
+                                className="h-7.5 w-7.5 p-0 text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-muted)]/20 transition-colors rounded-md"
+                                title={`Delete ${user.full_name}'s account`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </TableCell>
                         </TableRow>
                       )
                     })
@@ -491,6 +556,65 @@ export default function UserManagementClient() {
           </Card>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={!!userToDelete} onOpenChange={(open) => !open && !deleting && setUserToDelete(null)}>
+        <DialogContent className="bg-[var(--bg-surface)] border-[var(--border-default)] text-white sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-9 h-9 rounded-full bg-[var(--danger-muted)]/30 border border-[var(--danger)]/30 text-[var(--danger)] flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <DialogTitle className="text-base font-bold text-white">
+                Delete User Account
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-[var(--text-secondary)] leading-relaxed">
+              Are you sure you want to delete the account for <strong className="text-white">{userToDelete?.full_name}</strong> (<span className="text-[var(--gold-400)]">{userToDelete?.email}</span>)?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="bg-[var(--bg-elevated)] p-3 rounded-lg border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] space-y-1.5">
+            <p className="font-semibold text-white flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--danger)]" />
+              This action cannot be undone.
+            </p>
+            <p>
+              The user will immediately lose access to the system. All historical call logs and records created by this user will be safely preserved.
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0 mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setUserToDelete(null)}
+              disabled={deleting}
+              className="bg-transparent border-[var(--border-default)] text-white hover:bg-[var(--bg-hover)] text-xs h-8.5"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleDeleteUser}
+              disabled={deleting}
+              className="bg-[var(--danger)] hover:bg-[var(--danger)]/90 text-white font-semibold text-xs h-8.5 shadow-md flex items-center gap-1.5 ml-2"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Deleting Account...</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Permanently Delete</span>
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
