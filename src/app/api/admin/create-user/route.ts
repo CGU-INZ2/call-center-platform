@@ -14,14 +14,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // 2. Fetch caller's profile to verify admin role
-    const { data: profile, error: profileError } = await supabase
+    // 2. Fetch caller's profile to verify admin / superadmin role
+    const { data: callerProfile, error: profileError } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', adminUser.id)
       .single()
 
-    if (profileError || !profile || profile.role !== 'admin') {
+    if (
+      profileError ||
+      !callerProfile ||
+      (callerProfile.role !== 'admin' && callerProfile.role !== 'superadmin')
+    ) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 })
     }
 
@@ -47,8 +51,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    if (role !== 'admin' && role !== 'agent') {
+    if (role !== 'admin' && role !== 'agent' && role !== 'superadmin') {
       return NextResponse.json({ error: 'Invalid role value' }, { status: 400 })
+    }
+
+    // Standard admins can ONLY provision agent accounts
+    if (callerProfile.role === 'admin' && (role === 'admin' || role === 'superadmin')) {
+      return NextResponse.json(
+        { error: 'Forbidden: Only Super Administrators can provision Administrator accounts.' },
+        { status: 403 }
+      )
     }
 
     const sanitizedFullName = sanitizeInput(fullName)
@@ -91,7 +103,6 @@ export async function POST(request: Request) {
 
     if (logError) {
       console.error('Audit log error:', logError)
-      // Do not fail the request if audit logging fails
     }
 
     return NextResponse.json({ success: true, user: newUser })
@@ -100,4 +111,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-

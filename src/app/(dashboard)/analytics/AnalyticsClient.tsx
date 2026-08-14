@@ -75,7 +75,7 @@ export default function AnalyticsClient() {
     async function fetchData() {
       setLoading(true)
       try {
-        const isAdmin = profile!.role === 'admin'
+        const isAdmin = profile!.role === 'admin' || profile!.role === 'superadmin'
         const agentId = profile!.id
         const { start, end } = getDateRange(activePreset)
 
@@ -265,7 +265,7 @@ export default function AnalyticsClient() {
     )
   }
 
-  const isAdmin = profile?.role === 'admin'
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin'
 
   return (
     <div className="space-y-8">

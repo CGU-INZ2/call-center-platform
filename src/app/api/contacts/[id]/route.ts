@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient as createServerSupabase } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { isRateLimited } from '@/lib/rate-limit'
 import { sanitizeInput } from '@/lib/sanitize'
 
@@ -191,5 +192,116 @@ export async function PUT(
   } catch (err: any) {
     console.error('Update contact error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const supabase = await createServerSupabase()
+
+    // 1. Get caller session
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // 2. Fetch caller's profile to verify superadmin role
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError || !profile || profile.role !== 'superadmin') {
+      return NextResponse.json(
+        {
+          error:
+            'Forbidden: Only Super Administrators have permission to delete contacts.',
+        },
+        { status: 403 }
+      )
+    }
+
+    // 3. Rate limiting check
+    const ip = request.headers.get('x-forwarded-for') || user.id
+    const rateLimit = await isRateLimited({
+      action: 'delete_contact',
+      identifier: ip,
+      maxRequests: 20,
+      windowMs: 60000,
+    })
+
+    if (rateLimit.limited) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': '60' } }
+      )
+    }
+
+    const supabaseAdmin = createAdminClient()
+
+    // 4. Fetch target contact for audit log
+    const { data: targetContact, error: fetchError } = await supabaseAdmin
+      .from('contacts')
+      .select('id, full_name, phone, email, assigned_agent_id')
+      .eq('id', id)
+      .single()
+
+    if (fetchError || !targetContact) {
+      return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
+    }
+
+    // 5. Delete contact (cascades automatically to calls, followups, etc.)
+    const { error: deleteError } = await supabaseAdmin
+      .from('contacts')
+      .delete()
+      .eq('id', id)
+
+    if (deleteError) {
+      console.error('Error deleting contact:', deleteError)
+      return NextResponse.json(
+        { error: deleteError.message || 'Failed to delete contact.' },
+        { status: 500 }
+      )
+    }
+
+    // 6. Log deletion in audit_log
+    const { error: logError } = await supabaseAdmin.from('audit_log').insert({
+      actor_id: user.id,
+      action: 'DELETE_CONTACT',
+      entity_type: 'contact',
+      entity_id: id,
+      before_data: {
+        id: targetContact.id,
+        full_name: targetContact.full_name,
+        phone: targetContact.phone,
+        email: targetContact.email,
+        assigned_agent_id: targetContact.assigned_agent_id,
+      },
+      after_data: null,
+    })
+
+    if (logError) {
+      console.error('Failed to write audit log for contact deletion:', logError)
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Contact ${targetContact.full_name} and associated records removed successfully.`,
+    })
+  } catch (err: any) {
+    console.error('Delete contact error:', err)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }

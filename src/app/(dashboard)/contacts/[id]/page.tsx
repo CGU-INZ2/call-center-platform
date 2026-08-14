@@ -8,6 +8,7 @@ import InteractionTimeline, { TimelineEvent } from './InteractionTimeline'
 import CallLogModal from '@/components/shared/CallLogModal'
 import WhatsAppModal from '@/components/shared/WhatsAppModal'
 import PrayerRequestModal from '@/components/shared/PrayerRequestModal'
+import DeleteContactButton from './DeleteContactButton'
 import {
   ArrowLeft,
   Phone,
@@ -40,6 +41,15 @@ export default async function ContactDetailPage({ params }: ContactDetailPagePro
   // 1. Auth check
   const { data: { user }, error: userError } = await supabase.auth.getUser()
   if (userError || !user) redirect('/login')
+
+  // Fetch caller profile for role checks
+  const { data: callerProfile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  const isSuperAdmin = callerProfile?.role === 'superadmin'
 
   // 2. Fetch contact (primary data — server component, no spinner)
   const { data: contact, error: contactError } = await supabase
@@ -258,6 +268,14 @@ export default async function ContactDetailPage({ params }: ContactDetailPagePro
                   contactId={id}
                   contactName={contact.full_name}
                 />
+
+                {/* Delete Contact (Superadmin Only) */}
+                {isSuperAdmin && (
+                  <DeleteContactButton
+                    contactId={id}
+                    contactName={contact.full_name}
+                  />
+                )}
               </div>
             </CardContent>
           </Card>

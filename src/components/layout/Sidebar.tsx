@@ -12,7 +12,7 @@ export function Sidebar() {
   const { user, profile } = useUser()
   const supabase = createClient()
 
-  const isAdmin = profile?.role === 'admin'
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin'
 
   const navItems = [
     { icon: LayoutDashboard, label: 'Overview', href: '/' },

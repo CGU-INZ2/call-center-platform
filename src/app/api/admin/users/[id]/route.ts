@@ -28,14 +28,18 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // 2. Fetch caller's profile to verify admin role
+    // 2. Fetch caller's profile to verify admin/superadmin role
     const { data: callerProfile, error: callerProfileError } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', adminUser.id)
       .single()
 
-    if (callerProfileError || !callerProfile || callerProfile.role !== 'admin') {
+    if (
+      callerProfileError ||
+      !callerProfile ||
+      (callerProfile.role !== 'admin' && callerProfile.role !== 'superadmin')
+    ) {
       return NextResponse.json(
         { error: 'Forbidden: Administrator privileges required' },
         { status: 403 }
@@ -62,9 +66,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     const body = await request.json()
     const { role } = body
 
-    if (!role || (role !== 'admin' && role !== 'agent')) {
+    if (!role || (role !== 'admin' && role !== 'agent' && role !== 'superadmin')) {
       return NextResponse.json(
-        { error: "Invalid access role. Must be 'admin' or 'agent'." },
+        { error: "Invalid access role. Must be 'superadmin', 'admin', or 'agent'." },
         { status: 400 }
       )
     }
@@ -72,9 +76,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     const sanitizedRole = sanitizeInput(role)
 
     // 5. Prevent an admin from accidentally locking themselves out (self-demotion)
-    if (adminUser.id === targetUserId && sanitizedRole !== 'admin') {
+    if (adminUser.id === targetUserId && sanitizedRole !== callerProfile.role) {
       return NextResponse.json(
-        { error: 'You cannot demote your own administrator account.' },
+        { error: 'You cannot demote or change your own administrative account role.' },
         { status: 400 }
       )
     }
@@ -97,12 +101,37 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const oldRole = targetProfile.role
 
+    // 7. Role-tier permission enforcement:
+    // If caller is standard admin (NOT superadmin):
+    if (callerProfile.role === 'admin') {
+      // Cannot modify an existing admin or superadmin
+      if (oldRole === 'admin' || oldRole === 'superadmin') {
+        return NextResponse.json(
+          {
+            error:
+              'Forbidden: Administrators cannot modify roles of other Administrators. Only Super Administrators have this privilege.',
+          },
+          { status: 403 }
+        )
+      }
+      // Cannot promote anyone to admin or superadmin
+      if (sanitizedRole === 'admin' || sanitizedRole === 'superadmin') {
+        return NextResponse.json(
+          {
+            error:
+              'Forbidden: Only Super Administrators can grant Administrator privileges.',
+          },
+          { status: 403 }
+        )
+      }
+    }
+
     // If role is unchanged, return early
     if (oldRole === sanitizedRole) {
       return NextResponse.json({ success: true, profile: targetProfile })
     }
 
-    // 7. Update profile role in DB
+    // 8. Update profile role in DB
     const { data: updatedProfile, error: updateProfileError } = await supabaseAdmin
       .from('profiles')
       .update({
@@ -121,7 +150,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       )
     }
 
-    // 8. Update user_metadata in Supabase Auth
+    // 9. Update user_metadata in Supabase Auth
     try {
       await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
         user_metadata: {
@@ -131,10 +160,9 @@ export async function PATCH(request: Request, context: RouteContext) {
       })
     } catch (authMetaErr) {
       console.error('Failed to update auth metadata for user:', authMetaErr)
-      // Non-fatal, as database profile is the source of truth for RLS
     }
 
-    // 9. Write entry to audit_log
+    // 10. Write entry to audit_log
     const { error: logError } = await supabaseAdmin.from('audit_log').insert({
       actor_id: adminUser.id,
       action: 'UPDATE_USER_ROLE',
@@ -154,10 +182,17 @@ export async function PATCH(request: Request, context: RouteContext) {
       console.error('Failed to log audit record for role update:', logError)
     }
 
+    const roleName =
+      sanitizedRole === 'superadmin'
+        ? 'Super Administrator'
+        : sanitizedRole === 'admin'
+        ? 'Administrator'
+        : 'Call Agent'
+
     return NextResponse.json({
       success: true,
       profile: updatedProfile,
-      message: `User role updated to ${sanitizedRole === 'admin' ? 'Administrator' : 'Call Agent'}.`,
+      message: `User role updated to ${roleName}.`,
     })
   } catch (err: any) {
     console.error('Unexpected error in PATCH /api/admin/users/[id]:', err)
@@ -188,14 +223,18 @@ export async function DELETE(request: Request, context: RouteContext) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // 2. Fetch caller's profile to verify admin role
+    // 2. Fetch caller's profile to verify admin/superadmin role
     const { data: callerProfile, error: callerProfileError } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', adminUser.id)
       .single()
 
-    if (callerProfileError || !callerProfile || callerProfile.role !== 'admin') {
+    if (
+      callerProfileError ||
+      !callerProfile ||
+      (callerProfile.role !== 'admin' && callerProfile.role !== 'superadmin')
+    ) {
       return NextResponse.json(
         { error: 'Forbidden: Administrator privileges required' },
         { status: 403 }
@@ -205,12 +244,39 @@ export async function DELETE(request: Request, context: RouteContext) {
     // 3. Self-deletion guard: cannot delete yourself
     if (adminUser.id === targetUserId) {
       return NextResponse.json(
-        { error: 'You cannot delete your own administrator account.' },
+        { error: 'You cannot delete your own account.' },
         { status: 400 }
       )
     }
 
-    // 4. Rate limiting check
+    const supabaseAdmin = createAdminClient()
+
+    // 4. Fetch target profile info
+    const { data: targetProfile, error: targetProfileError } = await supabaseAdmin
+      .from('profiles')
+      .select('*')
+      .eq('id', targetUserId)
+      .single()
+
+    if (targetProfileError || !targetProfile) {
+      return NextResponse.json({ error: 'Target user not found' }, { status: 404 })
+    }
+
+    // 5. Tier permission check: standard admin cannot delete other admins or superadmins
+    if (
+      callerProfile.role === 'admin' &&
+      (targetProfile.role === 'admin' || targetProfile.role === 'superadmin')
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            'Forbidden: Administrators cannot delete other Administrator accounts. Only Super Administrators can delete administrators.',
+        },
+        { status: 403 }
+      )
+    }
+
+    // 6. Rate limiting check
     const ip = request.headers.get('x-forwarded-for') || adminUser.id
     const rateLimit = await isRateLimited({
       action: 'delete_user',
@@ -226,16 +292,7 @@ export async function DELETE(request: Request, context: RouteContext) {
       )
     }
 
-    const supabaseAdmin = createAdminClient()
-
-    // 5. Fetch target profile info for the audit log
-    const { data: targetProfile } = await supabaseAdmin
-      .from('profiles')
-      .select('*')
-      .eq('id', targetUserId)
-      .single()
-
-    // 6. Delete user from Supabase Auth (CASCADE removes profile & sets null on contacts/calls/followups)
+    // 7. Delete user from Supabase Auth (CASCADE removes profile & sets null on contacts/calls/followups)
     const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId)
 
     if (deleteAuthError) {
@@ -249,7 +306,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     // Also ensure profiles row is removed if cascade had any latency
     await supabaseAdmin.from('profiles').delete().eq('id', targetUserId)
 
-    // 7. Write entry to audit_log
+    // 8. Write entry to audit_log
     const { error: logError } = await supabaseAdmin.from('audit_log').insert({
       actor_id: adminUser.id,
       action: 'DELETE_USER',
@@ -257,9 +314,9 @@ export async function DELETE(request: Request, context: RouteContext) {
       entity_id: targetUserId,
       before_data: {
         id: targetUserId,
-        email: targetProfile?.email || null,
-        full_name: targetProfile?.full_name || 'N/A',
-        role: targetProfile?.role || 'agent',
+        email: targetProfile.email || null,
+        full_name: targetProfile.full_name || 'N/A',
+        role: targetProfile.role,
       },
       after_data: null,
     })

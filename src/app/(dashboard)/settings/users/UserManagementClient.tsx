@@ -34,7 +34,9 @@ import {
   Calendar, 
   Search, 
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Crown,
+  Lock
 } from 'lucide-react'
 import { useUser } from '@/lib/context/UserContext'
 
@@ -42,7 +44,7 @@ interface UserRecord {
   id: string
   email: string
   full_name: string
-  role: 'admin' | 'agent'
+  role: 'superadmin' | 'admin' | 'agent'
   is_active: boolean
   phone: string | null
   created_at: string
@@ -50,7 +52,7 @@ interface UserRecord {
 }
 
 export default function UserManagementClient() {
-  const { user: currentUser } = useUser()
+  const { user: currentUser, profile: currentProfile } = useUser()
 
   const [users, setUsers] = useState<UserRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -65,8 +67,10 @@ export default function UserManagementClient() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState<'admin' | 'agent'>('agent')
+  const [role, setRole] = useState<'superadmin' | 'admin' | 'agent'>('agent')
   const [submitting, setSubmitting] = useState(false)
+
+  const isSuperAdmin = currentProfile?.role === 'superadmin'
 
   const fetchUsers = async () => {
     try {
@@ -98,6 +102,12 @@ export default function UserManagementClient() {
 
     if (password.length < 6) {
       toast.error('Password must be at least 6 characters.')
+      return
+    }
+
+    // Standard admin check
+    if (!isSuperAdmin && role !== 'agent') {
+      toast.error('Only Super Administrators can create Administrator accounts.')
       return
     }
 
@@ -134,11 +144,16 @@ export default function UserManagementClient() {
 
   const handleRoleChange = async (
     targetUserId: string,
-    newRole: 'admin' | 'agent',
+    newRole: 'superadmin' | 'admin' | 'agent',
     targetUserName: string
   ) => {
-    if (currentUser?.id === targetUserId && newRole !== 'admin') {
-      toast.error('You cannot demote your own administrator account.')
+    if (currentUser?.id === targetUserId && newRole !== currentProfile?.role) {
+      toast.error('You cannot change your own administrative account role.')
+      return
+    }
+
+    if (!isSuperAdmin && (newRole === 'admin' || newRole === 'superadmin')) {
+      toast.error('Only Super Administrators can grant Administrator privileges.')
       return
     }
 
@@ -160,11 +175,14 @@ export default function UserManagementClient() {
         prev.map((u) => (u.id === targetUserId ? { ...u, role: newRole } : u))
       )
 
-      toast.success(
-        `Updated ${targetUserName}'s access role to ${
-          newRole === 'admin' ? 'Administrator' : 'Call Agent'
-        }.`
-      )
+      const roleLabel =
+        newRole === 'superadmin'
+          ? 'Super Administrator'
+          : newRole === 'admin'
+          ? 'Administrator'
+          : 'Call Agent'
+
+      toast.success(`Updated ${targetUserName}'s access role to ${roleLabel}.`)
     } catch (err: any) {
       console.error('Error changing user role:', err)
       toast.error(err.message || 'Failed to update access role.')
@@ -177,7 +195,13 @@ export default function UserManagementClient() {
     if (!userToDelete) return
 
     if (currentUser?.id === userToDelete.id) {
-      toast.error('You cannot delete your own administrator account.')
+      toast.error('You cannot delete your own account.')
+      setUserToDelete(null)
+      return
+    }
+
+    if (!isSuperAdmin && (userToDelete.role === 'admin' || userToDelete.role === 'superadmin')) {
+      toast.error('Only Super Administrators can delete Administrator accounts.')
       setUserToDelete(null)
       return
     }
@@ -205,7 +229,7 @@ export default function UserManagementClient() {
     }
   }
 
-  const filteredUsers = users.filter(user => {
+  const filteredUsers = users.filter((user) => {
     const term = searchQuery.toLowerCase()
     return (
       user.full_name.toLowerCase().includes(term) ||
@@ -217,8 +241,12 @@ export default function UserManagementClient() {
   return (
     <div className="space-y-6">
       <PageHeader 
-        title="User Settings" 
-        description="Provision new agent accounts, configure administrative privileges, and monitor team status."
+        title="User Settings & Team Hierarchy" 
+        description={
+          isSuperAdmin
+            ? 'Super Administrator Console: Provision accounts, configure administrator roles, and manage team access.'
+            : 'Administrator Console: Provision call agents and monitor team active status.'
+        }
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -234,7 +262,9 @@ export default function UserManagementClient() {
                 <div>
                   <CardTitle className="text-lg font-bold text-white">Create Member</CardTitle>
                   <CardDescription className="text-xs text-[var(--text-secondary)]">
-                    Add new administrator or call agent
+                    {isSuperAdmin
+                      ? 'Add new superadmin, admin, or agent'
+                      : 'Provision new call agent account'}
                   </CardDescription>
                 </div>
               </div>
@@ -296,20 +326,32 @@ export default function UserManagementClient() {
 
                 {/* Role Select */}
                 <div className="space-y-1.5">
-                  <Label htmlFor="role" className="text-xs font-semibold text-[var(--text-secondary)]">System Access Role</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="role" className="text-xs font-semibold text-[var(--text-secondary)]">System Access Role</Label>
+                    {!isSuperAdmin && (
+                      <span className="text-[10px] text-[var(--text-muted)] flex items-center gap-1">
+                        <Lock className="w-3 h-3" /> Agent Only
+                      </span>
+                    )}
+                  </div>
                   <div className="relative">
                     <Shield className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)] z-10 pointer-events-none" />
                     <Select
                       value={role}
-                      onValueChange={(val) => setRole(val as 'admin' | 'agent')}
-                      disabled={submitting}
+                      onValueChange={(val) => setRole(val as 'superadmin' | 'admin' | 'agent')}
+                      disabled={submitting || !isSuperAdmin}
                     >
                       <SelectTrigger className="w-full bg-[var(--bg-elevated)] border-[var(--border-default)] text-white focus:border-[var(--gold-500)] pl-10 h-9">
                         <SelectValue placeholder="Select Access Role" />
                       </SelectTrigger>
-                      <SelectContent className="bg-[var(--bg-surface)] border-[var(--border-default)]">
+                      <SelectContent className="bg-[var(--bg-surface)] border-[var(--border-default)] text-white">
                         <SelectItem value="agent">Call Agent</SelectItem>
-                        <SelectItem value="admin">System Administrator</SelectItem>
+                        {isSuperAdmin && (
+                          <>
+                            <SelectItem value="admin">Administrator</SelectItem>
+                            <SelectItem value="superadmin">Super Administrator</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -417,6 +459,11 @@ export default function UserManagementClient() {
 
                       const isCurrentLoggedInUser = user.id === currentUser?.id
                       const isUpdatingThisUser = updatingUserId === user.id
+                      const isTargetAdminOrSuper = user.role === 'admin' || user.role === 'superadmin'
+                      const canModifyThisUserRole = isSuperAdmin && !isCurrentLoggedInUser
+                      const canDeleteThisUser =
+                        !isCurrentLoggedInUser &&
+                        (isSuperAdmin || (!isTargetAdminOrSuper && currentProfile?.role === 'admin'))
 
                       return (
                         <TableRow key={user.id} className="border-b border-[var(--border-default)] hover:bg-[var(--bg-hover)] transition-colors">
@@ -440,39 +487,35 @@ export default function UserManagementClient() {
                             </div>
                           </TableCell>
 
-                          {/* Access Role Selector / Changer */}
+                          {/* Access Role Selector / Badge */}
                           <TableCell className="py-3.5 px-4">
-                            {isCurrentLoggedInUser ? (
-                              <Badge 
-                                variant="outline"
-                                className="bg-[var(--gold-500)]/10 text-[var(--gold-400)] border-[var(--gold-500)]/30 px-2.5 py-1 rounded-md font-medium text-xs flex items-center gap-1.5 w-fit"
+                            {canModifyThisUserRole ? (
+                              <Select
+                                value={user.role}
+                                onValueChange={(newRole) =>
+                                  handleRoleChange(user.id, newRole as 'superadmin' | 'admin' | 'agent', user.full_name)
+                                }
+                                disabled={isUpdatingThisUser}
                               >
-                                <Shield className="w-3.5 h-3.5 text-[var(--gold-400)]" />
-                                Administrator
-                              </Badge>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <Select
-                                  value={user.role}
-                                  onValueChange={(newRole) =>
-                                    handleRoleChange(user.id, newRole as 'admin' | 'agent', user.full_name)
-                                  }
-                                  disabled={isUpdatingThisUser}
+                                <SelectTrigger 
+                                  className={`h-7.5 w-[145px] text-xs border rounded-md transition-all ${
+                                    user.role === 'superadmin'
+                                      ? 'bg-purple-950/40 text-purple-300 border-purple-500/40 hover:bg-purple-900/40'
+                                      : user.role === 'admin'
+                                      ? 'bg-[var(--gold-500)]/10 text-[var(--gold-400)] border-[var(--gold-500)]/40 hover:bg-[var(--gold-500)]/20'
+                                      : 'bg-[var(--bg-elevated)] text-[var(--text-primary)] border-[var(--border-default)] hover:bg-[var(--bg-hover)]'
+                                  }`}
                                 >
-                                  <SelectTrigger 
-                                    className={`h-7.5 w-[130px] text-xs border rounded-md transition-all ${
-                                      user.role === 'admin'
-                                        ? 'bg-[var(--gold-500)]/10 text-[var(--gold-400)] border-[var(--gold-500)]/40 hover:bg-[var(--gold-500)]/20'
-                                        : 'bg-[var(--bg-elevated)] text-[var(--text-primary)] border-[var(--border-default)] hover:bg-[var(--bg-hover)]'
-                                    }`}
-                                  >
-                                    {isUpdatingThisUser ? (
-                                      <div className="flex items-center gap-1.5 text-xs text-[var(--gold-400)]">
-                                        <Loader2 className="w-3 h-3 animate-spin" />
-                                        <span>Saving...</span>
-                                      </div>
-                                    ) : (
-                                      <div className="flex items-center gap-1.5 truncate">
+                                  {isUpdatingThisUser ? (
+                                    <div className="flex items-center gap-1.5 text-xs text-[var(--gold-400)]">
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                      <span>Saving...</span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-1.5 truncate">
+                                      {user.role === 'superadmin' ? (
+                                        <Crown className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                                      ) : (
                                         <Shield
                                           className={`w-3.5 h-3.5 shrink-0 ${
                                             user.role === 'admin'
@@ -480,28 +523,62 @@ export default function UserManagementClient() {
                                               : 'text-[var(--text-muted)]'
                                           }`}
                                         />
-                                        <span className="truncate">
-                                          {user.role === 'admin' ? 'Administrator' : 'Call Agent'}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </SelectTrigger>
-                                  <SelectContent className="bg-[var(--bg-surface)] border-[var(--border-default)] text-white">
-                                    <SelectItem value="agent" className="text-xs focus:bg-[var(--bg-hover)]">
-                                      <div className="flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-[var(--text-muted)]" />
-                                        <span>Call Agent</span>
-                                      </div>
-                                    </SelectItem>
-                                    <SelectItem value="admin" className="text-xs focus:bg-[var(--bg-hover)]">
-                                      <div className="flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-[var(--gold-400)]" />
-                                        <span>Administrator</span>
-                                      </div>
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
+                                      )}
+                                      <span className="truncate">
+                                        {user.role === 'superadmin'
+                                          ? 'Super Admin'
+                                          : user.role === 'admin'
+                                          ? 'Administrator'
+                                          : 'Call Agent'}
+                                      </span>
+                                    </div>
+                                  )}
+                                </SelectTrigger>
+                                <SelectContent className="bg-[var(--bg-surface)] border-[var(--border-default)] text-white">
+                                  <SelectItem value="agent" className="text-xs focus:bg-[var(--bg-hover)]">
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-2 h-2 rounded-full bg-[var(--text-muted)]" />
+                                      <span>Call Agent</span>
+                                    </div>
+                                  </SelectItem>
+                                  <SelectItem value="admin" className="text-xs focus:bg-[var(--bg-hover)]">
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-2 h-2 rounded-full bg-[var(--gold-400)]" />
+                                      <span>Administrator</span>
+                                    </div>
+                                  </SelectItem>
+                                  <SelectItem value="superadmin" className="text-xs focus:bg-[var(--bg-hover)]">
+                                    <div className="flex items-center gap-2">
+                                      <Crown className="w-3 h-3 text-purple-400" />
+                                      <span className="text-purple-300 font-medium">Super Administrator</span>
+                                    </div>
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Badge 
+                                variant="outline"
+                                className={
+                                  user.role === 'superadmin'
+                                    ? 'bg-purple-950/40 text-purple-300 border-purple-500/30 px-2.5 py-1 rounded-md font-medium text-xs flex items-center gap-1.5 w-fit'
+                                    : user.role === 'admin'
+                                    ? 'bg-[var(--gold-500)]/10 text-[var(--gold-400)] border-[var(--gold-500)]/30 px-2.5 py-1 rounded-md font-medium text-xs flex items-center gap-1.5 w-fit'
+                                    : 'bg-white/5 text-[var(--text-secondary)] border-white/10 px-2.5 py-1 rounded-md font-medium text-xs flex items-center gap-1.5 w-fit'
+                                }
+                              >
+                                {user.role === 'superadmin' ? (
+                                  <Crown className="w-3.5 h-3.5 text-purple-400" />
+                                ) : (
+                                  <Shield className="w-3.5 h-3.5" />
+                                )}
+                                <span>
+                                  {user.role === 'superadmin'
+                                    ? 'Super Admin'
+                                    : user.role === 'admin'
+                                    ? 'Administrator'
+                                    : 'Call Agent'}
+                                </span>
+                              </Badge>
                             )}
                           </TableCell>
 
@@ -532,9 +609,7 @@ export default function UserManagementClient() {
 
                           {/* Actions: Delete Account */}
                           <TableCell className="py-3.5 px-4 text-right">
-                            {isCurrentLoggedInUser ? (
-                              <span className="text-xs text-[var(--text-muted)] italic">—</span>
-                            ) : (
+                            {canDeleteThisUser ? (
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -544,6 +619,10 @@ export default function UserManagementClient() {
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
+                            ) : (
+                              <span className="text-xs text-[var(--text-muted)] italic px-2">
+                                {isCurrentLoggedInUser ? '—' : <Lock className="w-3.5 h-3.5 text-[var(--text-muted)] inline" />}
+                              </span>
                             )}
                           </TableCell>
                         </TableRow>

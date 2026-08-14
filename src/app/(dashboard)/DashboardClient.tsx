@@ -33,7 +33,7 @@ export default function DashboardClient() {
     )
   }
 
-  if (profile.role === 'admin') {
+  if (profile.role === 'admin' || profile.role === 'superadmin') {
     return <AdminDashboard />
   }
 

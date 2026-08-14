@@ -6,7 +6,7 @@ import { User } from '@supabase/supabase-js'
 
 export interface Profile {
   id: string
-  role: 'admin' | 'agent'
+  role: 'superadmin' | 'admin' | 'agent'
   full_name: string
   phone: string | null
   avatar_url: string | null
