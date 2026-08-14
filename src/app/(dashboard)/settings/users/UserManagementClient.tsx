@@ -24,11 +24,11 @@ import {
   KeyRound, 
   User as UserIcon, 
   Calendar, 
-  ChevronDown, 
   Search, 
   CheckCircle2, 
-  XCircle 
+  AlertCircle
 } from 'lucide-react'
+import { useUser } from '@/lib/context/UserContext'
 
 interface UserRecord {
   id: string
@@ -42,9 +42,12 @@ interface UserRecord {
 }
 
 export default function UserManagementClient() {
+  const { user: currentUser } = useUser()
+
   const [users, setUsers] = useState<UserRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null)
   
   // Form states
   const [fullName, setFullName] = useState('')
@@ -114,6 +117,47 @@ export default function UserManagementClient() {
       console.error(err)
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleRoleChange = async (
+    targetUserId: string,
+    newRole: 'admin' | 'agent',
+    targetUserName: string
+  ) => {
+    if (currentUser?.id === targetUserId && newRole !== 'admin') {
+      toast.error('You cannot demote your own administrator account.')
+      return
+    }
+
+    setUpdatingUserId(targetUserId)
+    try {
+      const res = await fetch(`/api/admin/users/${targetUserId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to update user role')
+      }
+
+      // Optimistically update local users state
+      setUsers((prev) =>
+        prev.map((u) => (u.id === targetUserId ? { ...u, role: newRole } : u))
+      )
+
+      toast.success(
+        `Updated ${targetUserName}'s access role to ${
+          newRole === 'admin' ? 'Administrator' : 'Call Agent'
+        }.`
+      )
+    } catch (err: any) {
+      console.error('Error changing user role:', err)
+      toast.error(err.message || 'Failed to update access role.')
+    } finally {
+      setUpdatingUserId(null)
     }
   }
 
@@ -291,7 +335,7 @@ export default function UserManagementClient() {
                           </div>
                         </TableCell>
                         <TableCell className="py-4 px-4">
-                          <div className="h-5 w-16 bg-[var(--bg-elevated)] rounded-full" />
+                          <div className="h-5 w-24 bg-[var(--bg-elevated)] rounded-md" />
                         </TableCell>
                         <TableCell className="py-4 px-4">
                           <div className="h-4 w-20 bg-[var(--bg-elevated)] rounded" />
@@ -323,33 +367,97 @@ export default function UserManagementClient() {
                         day: 'numeric'
                       })
 
-                      const isSystemAdmin = user.role === 'admin'
+                      const isCurrentLoggedInUser = user.id === currentUser?.id
+                      const isUpdatingThisUser = updatingUserId === user.id
 
                       return (
                         <TableRow key={user.id} className="border-b border-[var(--border-default)] hover:bg-[var(--bg-hover)] transition-colors">
+                          {/* User Avatar + Info */}
                           <TableCell className="py-3.5 px-4">
                             <div className="flex items-center gap-3">
                               <div className="w-9 h-9 rounded-full bg-[var(--gold-500)]/15 border border-[var(--gold-500)]/20 text-[var(--gold-400)] flex items-center justify-center font-bold text-sm shrink-0">
                                 {initials}
                               </div>
                               <div className="flex flex-col min-w-0">
-                                <span className="text-sm font-semibold text-white truncate">{user.full_name}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-semibold text-white truncate">{user.full_name}</span>
+                                  {isCurrentLoggedInUser && (
+                                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-[var(--gold-500)]/20 text-[var(--gold-400)] font-medium border border-[var(--gold-500)]/30">
+                                      You
+                                    </span>
+                                  )}
+                                </div>
                                 <span className="text-xs text-[var(--text-secondary)] truncate">{user.email}</span>
                               </div>
                             </div>
                           </TableCell>
+
+                          {/* Access Role Selector / Changer */}
                           <TableCell className="py-3.5 px-4">
-                            <Badge 
-                              variant="outline"
-                              className={
-                                isSystemAdmin 
-                                  ? 'bg-[var(--gold-500)]/10 text-[var(--gold-400)] border-[var(--gold-500)]/30 px-2 py-0.5 rounded font-medium'
-                                  : 'bg-white/5 text-[var(--text-secondary)] border-white/10 px-2 py-0.5 rounded font-medium'
-                              }
-                            >
-                              {isSystemAdmin ? 'Admin' : 'Agent'}
-                            </Badge>
+                            {isCurrentLoggedInUser ? (
+                              <Badge 
+                                variant="outline"
+                                className="bg-[var(--gold-500)]/10 text-[var(--gold-400)] border-[var(--gold-500)]/30 px-2.5 py-1 rounded-md font-medium text-xs flex items-center gap-1.5 w-fit"
+                              >
+                                <Shield className="w-3.5 h-3.5 text-[var(--gold-400)]" />
+                                Administrator
+                              </Badge>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <Select
+                                  value={user.role}
+                                  onValueChange={(newRole) =>
+                                    handleRoleChange(user.id, newRole as 'admin' | 'agent', user.full_name)
+                                  }
+                                  disabled={isUpdatingThisUser}
+                                >
+                                  <SelectTrigger 
+                                    className={`h-7.5 w-[130px] text-xs border rounded-md transition-all ${
+                                      user.role === 'admin'
+                                        ? 'bg-[var(--gold-500)]/10 text-[var(--gold-400)] border-[var(--gold-500)]/40 hover:bg-[var(--gold-500)]/20'
+                                        : 'bg-[var(--bg-elevated)] text-[var(--text-primary)] border-[var(--border-default)] hover:bg-[var(--bg-hover)]'
+                                    }`}
+                                  >
+                                    {isUpdatingThisUser ? (
+                                      <div className="flex items-center gap-1.5 text-xs text-[var(--gold-400)]">
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                        <span>Saving...</span>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-1.5 truncate">
+                                        <Shield
+                                          className={`w-3.5 h-3.5 shrink-0 ${
+                                            user.role === 'admin'
+                                              ? 'text-[var(--gold-400)]'
+                                              : 'text-[var(--text-muted)]'
+                                          }`}
+                                        />
+                                        <span className="truncate">
+                                          {user.role === 'admin' ? 'Administrator' : 'Call Agent'}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-[var(--bg-surface)] border-[var(--border-default)] text-white">
+                                    <SelectItem value="agent" className="text-xs focus:bg-[var(--bg-hover)]">
+                                      <div className="flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-[var(--text-muted)]" />
+                                        <span>Call Agent</span>
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="admin" className="text-xs focus:bg-[var(--bg-hover)]">
+                                      <div className="flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-[var(--gold-400)]" />
+                                        <span>Administrator</span>
+                                      </div>
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
                           </TableCell>
+
+                          {/* Account Status */}
                           <TableCell className="py-3.5 px-4">
                             <div className="flex items-center gap-2">
                               {user.is_active ? (
@@ -365,6 +473,8 @@ export default function UserManagementClient() {
                               )}
                             </div>
                           </TableCell>
+
+                          {/* Registration Date */}
                           <TableCell className="py-3.5 px-4 text-xs text-[var(--text-secondary)]">
                             <div className="flex items-center gap-1.5">
                               <Calendar className="h-3.5 w-3.5 shrink-0" />
